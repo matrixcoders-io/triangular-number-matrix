@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Triangular Big Number Calculator</title>
+    <style>
+        textarea {
+            width: 100%;
+            height: 100px;
+            font-size: 16px;
+            resize: both;
+            white-space: pre-wrap;       /* Wraps long lines */
+            word-wrap: break-word;       /* Break long words if needed */
+            overflow-wrap: break-word;
+        }
+        .field {
+            margin-bottom: 20px;
+        }
+        .file-input {
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Triangular Big Number Calculator</h1>
+    <form method="post" enctype="multipart/form-data">
+        <table style="width: 100%; border: 1px solid black; margin: 0; padding: 0;" >
+            <tr  style="background-color: #f8f2d7;">
+            <td>
+                <div class="field">
+                    <label><b>Number (n):</b></label><br>
+                    <textarea name="num1" id="num1" placeholder="Enter REP-DIGIT number or select REP-DIGIT file from the library below">{{ num1 or '' }}</textarea><br>
+                    <!-- <input class="file-input" type="file" id="file1" accept=".txt"> -->
+                    <!-- <input type="checkbox" id="filesource" name="filesource" value="local">Typed Local File Name (for large files) -->
+                    <select id="file_names" name="file_names">
+                        <option value="">Select a file...</option>
+                        {% for file in file_names %}
+                            <option value="{{ file }}">{{ file }}</option>
+                        {% endfor %}
+                    </select>
+                    <b style="color: green;">Step (1)</b> Select the file from a library to know it's triangular number.
+                </div>
+                </td>
+                <td>
+                <div class="field">
+                    <label><b>Increment:</b></label> Number of times to increament after REP-DIGIT value is calculated<br>
+                    <textarea name="num2" id="num2" placeholder="Enter or upload second big number">{{ num2 or '0' }}</textarea><br>
+                    <!-- <input class="file-input" type="file" id="file2" accept=".txt"> -->
+                    <button onclick="eraseText()">Erase Number</button><b style="color: green;"> Step (4)</b> erase number to run next number.
+                </div>
+                </td>
+            </tr>
+        
+            <tr style="background-color: #e6e6e6;">
+                <td>
+                <div class="field">
+                    <label><b>Operation:</b></label><br>
+                    <select name="operation">
+                        <!--
+                        <option value="add" {% if selected_operation == 'add' %}selected{% endif %}>Addition</option>
+                        <option value="subtract" {% if selected_operation == 'subtract' %}selected{% endif %}>Subtraction</option>
+                        <option value="multiply" {% if selected_operation == 'multiply' %}selected{% endif %}>Multiplication</option>
+                        <option value="divide" {% if selected_operation == 'divide' %}selected{% endif %}>Division</option> 
+                        <option value="tri_add" {% if selected_operation == 'tri_add' %}selected{% endif %}>Triangular Number using Addition</option>
+                        <option value="tri_formula" {% if selected_operation == 'tri_formula' %}selected{% endif %}>Triangular Number by Hand</option> -->
+                        <option value="tri_div_simpy_formula" {% if selected_operation == 'tri_div_simpy_formula' %}selected{% endif %}>Triangular Number by Division sympy</option>
+                        <option value="tri_div_gmpy2_formula" {% if selected_operation == 'tri_div_gmpy2_formula' %}selected{% endif %}>Triangular Number by Division gmpy2</option>
+                        <option value="tri_matrix" {% if selected_operation == 'tri_matrix' %}selected{% endif %}>Triangular Number using Matrix</option>
+                    </select>
+                    <b style="color: green;">Step (2)</b> Select which Traingular Number method to use for calculations.
+                </div>
+
+                <button type="submit">Calculate</button><b style="color: green;"> Step (3)</b> Click "Calculate" button to calculate triangular number
+                </td>
+                <td>
+            {% if result %}
+                <b style="font-size: 25px;">Result: </b>Elapsed Time: <span id="elapsed_display" style="color: red;">{{ '%.6f' % elapsed }} seconds.</span> <input type="hidden" name="elapsed" id="elapsed" value="{{ '%.6f' % elapsed }}" /> Percent Change: <span id="percent_change" style="color: green;">{{ '%.6f' % percent_change }} %.</span> 
+            {% elif error %}
+                <h2>Error:</h2>
+                <p style="color: red;">{{ error }}</p>
+            {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2">
+                    <textarea readonly>{{ result }}</textarea>                    
+                </td>
+            </tr>
+        </table>
+        <br>
+            
+        To generate larger rep-digit files use the following numbers generator python program.<br><br>
+            <b>python3 generate_numbers.py input_file.txt output_file.txt number_of_times</b><br>
+            # Example of generating million digit file with rep-digit 1 from 1000 digit file:<br>
+            <b>python3 generate_numbers.py static/numbers/1-1k.txt static/numbers/1-1m.txt 1000</b><br>
+            # Another example from 1 million to 100 million<br>
+            <b>python3 generate_numbers.py static/numbers/1-1m.txt static/numbers/1-100m.txt 100</b><br>
+        <p style="color: rgb(255, 21, 0);"><b>WARNING</b>: If you are increasing numbers in billions or 100s of millions the results minght not show up in UI and should be checked at the terminal window.</p>
+        <h3>Example terminal output:</h3>
+             rep digit complete using Matrix: 0.0016195409698411822<br>
+             Operation complete, elapsed time: 0.0016771249938756227<br>
+    </form>
+    <script>
+        function readFile(fileId, textId) {
+            const fileInput = document.getElementById(fileId);
+            const textArea = document.getElementById(textId);
+            fileInput.addEventListener('change', () => {
+                const file = fileInput.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    textArea.value = e.target.result.trim();
+                };
+                reader.readAsText(file);
+            });
+        }
+
+        function eraseText() {
+            document.getElementById("num1").value = "";
+        }
+        // readFile('file1', 'num1');
+        // readFile('file2', 'num2');
+        
+    </script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+Flask==2.3.2
+requests
+gunicorn
+gmpy2>=2.1.0
+numpy
+sympy
+pybaseconv
