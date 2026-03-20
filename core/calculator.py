@@ -9,7 +9,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from repdigit_cache import RepdigitCache  # <-- NEW
+from .repdigit_cache import RepdigitCache  # <-- NEW
 
 sys.set_int_max_str_digits(100000000)
 # Allow huge numbers
