@@ -97,7 +97,13 @@
       <div class="result-inset">
         <div class="result-inset-header">
           <span><span style="opacity:0.9;">⊕</span> Result</span>
-          <span class="panel-subtitle">Triangular Number Output</span>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="display-mode-label">Triangular Number Output</span>
+            <div class="display-mode-switch">
+              <button class="display-mode-btn" data-mode="standard">Standard</button>
+              <button class="display-mode-btn active" data-mode="pyramid">Pyramid</button>
+            </div>
+          </div>
         </div>
         <div id="result-panel">
           {% include "partials/result_panel.html" %}

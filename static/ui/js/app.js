@@ -346,6 +346,7 @@ let _windowOffset     = 0;   // absolute start position of current window in ful
 let _navOffset        = 0;   // legacy alias — equals _windowOffset
 let _currentPage      = 1;   // 1-based page number of current window
 let _totalPages       = 0;   // total pages = ceil(_resultTotalChars / RESULT_WINDOW)
+let _displayMode      = 'pyramid';  // 'standard' | 'pyramid'
 
 /** Convert 1-based page number to byte/char offset. */
 function pageToOffset(page) { return Math.max(0, page - 1) * RESULT_WINDOW; }
@@ -373,6 +374,9 @@ function initResultNav() {
         if (!isNaN(page) && page >= 1) loadWindow(pageToOffset(page));
         break;
       }
+      default:
+        if (e.target.classList.contains('display-mode-btn'))
+          setDisplayMode(e.target.dataset.mode);
     }
   });
 }
@@ -409,6 +413,151 @@ function renderWindowContent(text) {
 }
 
 /**
+ * Build a text pyramid of the triangular number.
+ *
+ * Design: inner-accumulation with centered apex.
+ *   - Apex (row 0, top): leftRem + VPC + rightRem, centered over the gap column.
+ *   - Row k (k=1..cap): innermost k left-patterns right-aligned + gap + innermost k right-patterns left-aligned.
+ *   - Cap = min(N, M, MAX_PYRAMID_ROWS) — show the patterns closest to the VPC.
+ *   - The gap column is fixed at cap × hplLen for all rows → apex sits centered above the pyramid.
+ *   - Trailing spaces are trimmed per line for clean output.
+ *
+ * Visual result (narrow at top, wide at bottom — proper pyramid shape):
+ *
+ *              [leftRem VPC rightRem]
+ *       [pN]  ···gap···  [q1]
+ *    [pN-1 pN] ···gap··· [q1 q2]
+ *  [pN-2..pN]  ···gap···  [q1..q3]
+ */
+const MAX_PYRAMID_ROWS = 10;
+
+function buildPyramid(text, vpcVal, hpl, hpr) {
+  if (!vpcVal || vpcVal === '—') return null;
+  if (!hpl || hpl === '—' || !hpr || hpr === '—') return null;
+
+  const vpcIdx = text.indexOf(vpcVal);
+  if (vpcIdx === -1) return null;
+
+  const leftPart  = text.slice(0, vpcIdx);
+  const rightPart = text.slice(vpcIdx + vpcVal.length);
+  const hplLen    = hpl.length;
+  const hprLen    = hpr.length;
+
+  // Left: full hpl patterns + partial remainder at end (partial is closest to VPC)
+  const leftRemLen  = leftPart.length % hplLen;
+  const leftRemStr  = leftRemLen > 0 ? leftPart.slice(-leftRemLen) : '';
+  const leftFullStr = leftRemLen > 0 ? leftPart.slice(0, -leftRemLen) : leftPart;
+  const leftFull    = [];
+  for (let i = 0; i < leftFullStr.length; i += hplLen)
+    leftFull.push(leftFullStr.slice(i, i + hplLen));
+
+  // Right: partial remainder at start (closest to VPC) + full hpr patterns
+  const rightRemLen  = rightPart.length % hprLen;
+  const rightRemStr  = rightRemLen > 0 ? rightPart.slice(0, rightRemLen) : '';
+  const rightFullStr = rightRemLen > 0 ? rightPart.slice(rightRemLen) : rightPart;
+  const rightFull    = [];
+  for (let i = 0; i < rightFullStr.length; i += hprLen)
+    rightFull.push(rightFullStr.slice(i, i + hprLen));
+
+  const N      = leftFull.length;
+  const M      = rightFull.length;
+  const vpcLen = vpcVal.length;
+
+  // Cumulative design: cap rows, each row shows ALL patterns from VPC outward to that layer.
+  // gapCol is the indent of the apex, sized so row `cap` starts at column 0.
+  const cap    = Math.min(N, M, MAX_PYRAMID_ROWS);
+  if (cap === 0) return null;
+  const gapCol = cap * hplLen + leftRemLen;
+
+  const lines  = [];
+
+  // Apex: VPC alone, highlighted
+  lines.push(' '.repeat(gapCol) + '<span class="vpc-highlight">' + vpcVal + '</span>');
+
+  // Body rows: row k shows k innermost left patterns + leftRem | rightRem + k innermost right patterns
+  for (let k = 1; k <= cap; k++) {
+    let leftStr = '';
+    for (let i = N - k; i < N; i++) leftStr += leftFull[i];
+    leftStr += leftRemStr;
+
+    let rightStr = rightRemStr;
+    for (let i = 0; i < k; i++) rightStr += rightFull[i];
+
+    const leftPad = ' '.repeat(gapCol - leftStr.length);
+    lines.push(leftPad + leftStr + ' '.repeat(vpcLen) + rightStr);
+  }
+
+  return { html: lines.join('\n'), gapCol };
+}
+
+/** Render the current result window as a pyramid into #number-display. */
+function renderPyramid() {
+  const display = document.getElementById('number-display');
+  if (!display) return;
+
+  if (_resultTotalChars > RESULT_WINDOW) {
+    display.classList.remove('pyramid-mode');
+    display.textContent =
+      'Pyramid view is only available for results ≤ 10,000 digits.\n' +
+      'This result has ' + _resultTotalChars.toLocaleString() + ' digits — use Standard view.';
+    return;
+  }
+
+  const vpcVal = document.getElementById('active-const-value')?.textContent.trim() ?? '';
+  const hpl    = document.getElementById('const-hpl')?.textContent.trim() ?? '';
+  const hpr    = document.getElementById('const-hpr')?.textContent.trim() ?? '';
+
+  if (!vpcVal || vpcVal === '—') {
+    display.classList.remove('pyramid-mode');
+    display.textContent = 'No active constant — calculate a result first, then select Pyramid view.';
+    return;
+  }
+
+  const result = buildPyramid(_resultFull, vpcVal, hpl, hpr);
+  if (!result) {
+    display.classList.remove('pyramid-mode');
+    display.textContent = _resultFull; // fall back to raw digits
+    return;
+  }
+
+  const { html: pyramid, gapCol } = result;
+  display.classList.add('pyramid-mode');
+  display.innerHTML = pyramid;
+  display.scrollTop = 0;
+
+  // Auto-scroll horizontally to center the VPC column in the viewport
+  requestAnimationFrame(() => {
+    const probe = document.createElement('span');
+    probe.style.cssText = 'visibility:hidden;position:absolute;white-space:pre;font:inherit;';
+    probe.textContent = '0'.repeat(100);
+    display.appendChild(probe);
+    const charWidth = probe.getBoundingClientRect().width / 100;
+    display.removeChild(probe);
+    display.scrollLeft = Math.max(0, gapCol * charWidth - display.clientWidth / 2);
+  });
+}
+
+/** Sync display-mode toggle buttons then render in the current mode. */
+function renderCurrentMode() {
+  document.querySelectorAll('.display-mode-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mode === _displayMode);
+  });
+  if (_displayMode === 'pyramid') {
+    renderPyramid();
+  } else {
+    const display = document.getElementById('number-display');
+    if (display) display.classList.remove('pyramid-mode');
+    renderWindowContent(_resultFull);
+  }
+}
+
+/** Switch display mode and re-render. */
+function setDisplayMode(mode) {
+  _displayMode = mode;
+  renderCurrentMode();
+}
+
+/**
  * Fetch a RESULT_WINDOW-sized chunk of the full result from the server,
  * update state, and re-render the display.
  * @param {number} offset  Absolute character position in the full result.
@@ -436,7 +585,7 @@ async function loadWindow(offset) {
     const navTotal = document.getElementById('nav-total');
     if (navTotal) navTotal.textContent = `/ ${_totalPages.toLocaleString()} pages`;
 
-    renderWindowContent(_resultFull);
+    renderCurrentMode();
   } catch (e) {
     console.error('loadWindow failed:', e);
   }
@@ -467,8 +616,8 @@ function onResultSwap() {
   const navTotal = document.getElementById('nav-total');
   if (navTotal) navTotal.textContent = `/ ${_totalPages.toLocaleString()} pages`;
 
-  // Render first window with VPC gold highlight if the constant appears here.
-  renderWindowContent(_resultFull);
+  // Render in the current display mode (standard or pyramid).
+  renderCurrentMode();
 }
 
 /* ============================================================

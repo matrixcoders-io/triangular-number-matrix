@@ -1,6 +1,6 @@
 # PROJECT.MD — Triangular Number Matrix Calculator
 
-> Last updated: 2026-03-21 | Current phase: Phase 2 complete, Phase 3 (testing) next
+> Last updated: 2026-03-21 (session 2) | Current phase: Phase 2 in progress — pyramid display algorithm unresolved
 
 ---
 
@@ -275,7 +275,7 @@ Flask reads `file_mode` to decide whether to read from disk or use the `num1` te
 |-------|--------|---------|
 | Phase 0 — Bug Fixes | ✅ Complete | Fixed duplicate Flask init, TypeError, logging, file_load_time string type |
 | Phase 1 — Structural Refactor | ✅ Complete | Blueprints, core/, ui/templates/, static/ui/, config.py |
-| Phase 2 — UI Enhancements | ✅ Complete | HTMX partial swaps, VPC constants panel, file browser, run history, lab panel, file input mode toggle, result nav, 10K display cap |
+| Phase 2 — UI Enhancements | 🔄 In Progress | HTMX partial swaps, VPC constants panel, file browser, run history, lab panel, file input mode toggle, result nav, 10K display cap — **Pyramid display BROKEN** (delta design shows hollow triangle; need cumulative cap=10 design) |
 | Phase 3 — Testing Expansion | 🔲 Next | Expand test coverage, all 4 modes × all 9 digits, edge cases |
 | Phase 4 — Non-repdigit / Increment | 🔲 Planned | Polish `increment_by_gmpy_count`, UI support for offset input |
 
