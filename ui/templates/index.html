@@ -13,7 +13,7 @@
   <div class="panel">
     <div class="panel-header">
       <span class="panel-title"><span class="panel-title-icon">⬡</span>Calculator</span>
-      <span style="font-size:0.72rem; color: var(--text-muted);">Repdigit Triangular Number Engine</span>
+      <span class="panel-subtitle">Repdigit Triangular Number Engine</span>
     </div>
     <div class="panel-body">
       <form
@@ -41,54 +41,66 @@
           rows="5"
         >{{ num1 or '' }}</textarea>
 
-        <div style="margin-top: 12px;">
-          <div class="input-label">Increment (optional)</div>
-          <input
-            class="input-control"
-            type="text"
-            name="num2"
-            id="num2"
-            value="{{ num2 or '' }}"
-            placeholder="0"
-            style="max-width: 200px;"
-          >
+        <div class="calc-bottom-row">
+          <div class="form-group" style="flex: 0 0 120px;">
+            <div class="input-label">Increment</div>
+            <input
+              class="input-control"
+              type="text"
+              name="num2"
+              id="num2"
+              value="{{ num2 or '' }}"
+              placeholder="0"
+            >
+          </div>
+          <div class="form-group" style="flex: 1; min-width: 0;">
+            <label class="form-label" for="operation">Method</label>
+            <select class="select-control" name="operation" id="operation">
+              <option value="tri_matrix"
+                {% if selected_operation == 'tri_matrix' %}selected{% endif %}>
+                Matrix (in-memory)
+              </option>
+              <option value="tri_matrix_memory"
+                {% if selected_operation == 'tri_matrix_memory' %}selected{% endif %}>
+                Matrix Memory (chunked)
+              </option>
+              <option value="tri_matrix_stream"
+                {% if selected_operation == 'tri_matrix_stream' %}selected{% endif %}>
+                Matrix Stream (disk write)
+              </option>
+              <option value="tri_matrix_random"
+                {% if selected_operation == 'tri_matrix_random' %}selected{% endif %}>
+                Matrix Random (shortform)
+              </option>
+              <option value="tri_div_gmpy2_formula"
+                {% if selected_operation == 'tri_div_gmpy2_formula' %}selected{% endif %}>
+                Division gmpy2 (baseline)
+              </option>
+              <option value="tri_div_simpy_formula"
+                {% if selected_operation == 'tri_div_simpy_formula' %}selected{% endif %}>
+                Division sympy
+              </option>
+            </select>
+          </div>
+          <div style="flex: 0 0 auto; display:flex; align-items:flex-end;">
+            <button class="btn-calculate" type="submit">
+              <span class="btn-triangle">▲</span> Calculate Triangular Number
+            </button>
+          </div>
         </div>
-
-        <div class="form-group" style="margin-top: 14px;">
-          <label class="form-label" for="operation">Method</label>
-          <select class="select-control" name="operation" id="operation">
-            <option value="tri_matrix"
-              {% if selected_operation == 'tri_matrix' %}selected{% endif %}>
-              Matrix (in-memory)
-            </option>
-            <option value="tri_matrix_memory"
-              {% if selected_operation == 'tri_matrix_memory' %}selected{% endif %}>
-              Matrix Memory (chunked)
-            </option>
-            <option value="tri_matrix_stream"
-              {% if selected_operation == 'tri_matrix_stream' %}selected{% endif %}>
-              Matrix Stream (disk write)
-            </option>
-            <option value="tri_matrix_random"
-              {% if selected_operation == 'tri_matrix_random' %}selected{% endif %}>
-              Matrix Random (shortform b=…,l=…,n=…)
-            </option>
-            <option value="tri_div_gmpy2_formula"
-              {% if selected_operation == 'tri_div_gmpy2_formula' %}selected{% endif %}>
-              Division gmpy2 (baseline)
-            </option>
-            <option value="tri_div_simpy_formula"
-              {% if selected_operation == 'tri_div_simpy_formula' %}selected{% endif %}>
-              Division sympy
-            </option>
-          </select>
-        </div>
-
-        <button class="btn-calculate" type="submit">
-          <span class="btn-triangle">▲</span> Calculate Triangular Number
-        </button>
         <div class="loading-bar"></div>
       </form>
+
+      {# ── Result (inset, below calculator controls) ── #}
+      <div class="result-inset">
+        <div class="result-inset-header">
+          <span><span style="opacity:0.9;">⊕</span> Result</span>
+          <span class="panel-subtitle">Triangular Number Output</span>
+        </div>
+        <div id="result-panel">
+          {% include "partials/result_panel.html" %}
+        </div>
+      </div>
     </div>
   </div>{# /calculator panel #}
 
@@ -97,7 +109,7 @@
   <div class="panel">
     <div class="panel-header">
       <span class="panel-title"><span class="panel-title-icon">◈</span>Matrix Constants</span>
-      <span style="font-size:0.72rem; color: var(--text-muted);">vpc · hpl · hpr</span>
+      <span class="panel-subtitle">vpc · hpl · hpr</span>
     </div>
     <div class="panel-body">
 
@@ -159,26 +171,12 @@
 
 
 {# ══════════════════════════════════════════════════════════════════
-   RESULT PANEL
-   ══════════════════════════════════════════════════════════════════ #}
-<div class="panel result-panel">
-  <div class="panel-header">
-    <span class="panel-title"><span class="panel-title-icon">⊕</span>Result</span>
-    <span style="font-size:0.72rem; color: var(--text-muted);">Triangular Number Output</span>
-  </div>
-  <div id="result-panel">
-    {% include "partials/result_panel.html" %}
-  </div>
-</div>
-
-
-{# ══════════════════════════════════════════════════════════════════
    FILE LIBRARY (scrollable)
    ══════════════════════════════════════════════════════════════════ #}
 <div class="panel">
   <div class="panel-header">
     <span class="panel-title"><span class="panel-title-icon">◫</span>File Library</span>
-    <span style="font-size:0.72rem; color: var(--text-muted);">{{ file_names | length }} files · click Use to load</span>
+    <span class="panel-subtitle">{{ file_names | length }} files · click Use to load</span>
   </div>
   <div class="panel-body" style="padding: 0;">
     <div style="max-height: 290px; overflow-y: auto;">
@@ -227,13 +225,14 @@
     ><span class="collapse-icon" style="display:inline-block; transition: transform 0.2s;">▼</span></button>
   </div>
   <div id="history-body">
-    <div class="panel-body">
+    <div class="panel-body" style="padding: 0;">
       <div
         id="history-table-wrap"
         hx-get="/stats/history"
         hx-trigger="load, calcDone from:body"
         hx-swap="innerHTML"
-      ><span style="color: var(--text-muted); font-size: 0.82rem;">Loading…</span></div>
+        style="max-height: 220px; overflow-y: auto; padding: 12px 20px;"
+      ><span style="color: var(--text-secondary); font-size: 0.82rem;">Loading…</span></div>
     </div>
   </div>
 </div>
@@ -293,9 +292,7 @@
 <div class="panel">
   <div class="panel-header">
     <span class="panel-title"><span class="panel-title-icon">⚙</span>File Input Mode</span>
-    <span style="font-size:0.72rem; color: var(--text-muted);">
-      Controls how "Use" loads files — configurable at startup via env vars
-    </span>
+    <span class="panel-subtitle">Controls how "Use" loads files — configurable at startup via env vars</span>
   </div>
   <div class="panel-body">
     <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-start;">
@@ -356,12 +353,12 @@
   // ── History table renderer ──────────────────────────────────────
   function renderHistoryTable(wrap, data) {
     if (!Array.isArray(data) || data.length === 0) {
-      wrap.innerHTML = '<span style="color: var(--text-muted); font-size: 0.82rem;">No runs recorded yet. Run a calculation to see benchmarks here.</span>';
+      wrap.innerHTML = '<span style="color: var(--text-secondary); font-size: 0.82rem;">No runs recorded yet. Run a calculation to see benchmarks here.</span>';
       return;
     }
     const rows = data.slice().reverse().map(r => `
       <tr>
-        <td style="color:var(--text-muted);font-family:var(--font-mono);font-size:0.75rem;">${r.ts}</td>
+        <td style="color:var(--text-secondary);font-family:var(--font-mono);font-size:0.75rem;">${r.ts}</td>
         <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--cyan);">${r.method}</td>
         <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--gold);">${r.repdigit}</td>
         <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--text-secondary);">${Number(r.length).toLocaleString()}</td>

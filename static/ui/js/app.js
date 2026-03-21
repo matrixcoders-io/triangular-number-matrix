@@ -219,6 +219,11 @@ function initFileBrowser() {
       document.querySelectorAll('.btn-use.active').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
 
+      // Immediately update Number Family from filename (e.g. "6-1k.txt" → digit 6).
+      // Fires before the async preview fetch so the panel updates instantly on click.
+      const fileDigit = filename.match(/^(\d)/)?.[1];
+      if (fileDigit && MATRIX[fileDigit]) updateConstantsPanel(fileDigit, null);
+
       const mode = getFileMode();
 
       if (mode === 'disk') {
@@ -330,9 +335,11 @@ function initResultNav() {
 function navTo(offset) {
   if (!_resultFull) return;
   _navOffset = Math.max(0, Math.min(offset, _resultLength - 1));
-  const slice = _resultFull.slice(_navOffset, _navOffset + NAV_WINDOW);
   const display = document.getElementById('number-display');
-  if (display) display.textContent = slice;
+  if (display && _resultLength > 0) {
+    const scrollRatio = _navOffset / _resultLength;
+    display.scrollTop = display.scrollHeight * scrollRatio;
+  }
   const navIndex = document.getElementById('nav-index');
   if (navIndex) navIndex.value = _navOffset;
   const navTotal = document.getElementById('nav-total');
@@ -349,7 +356,27 @@ function onResultSwap() {
   _resultFull   = fullEl.textContent;
   _resultLength = _resultFull.length;
   _navOffset    = 0;
-  navTo(0);
+
+  // Update nav indicator.
+  const navIndex = document.getElementById('nav-index');
+  if (navIndex) navIndex.value = 0;
+  const navTotal = document.getElementById('nav-total');
+  if (navTotal) navTotal.textContent = `/ ${_resultLength.toLocaleString()}`;
+
+  // Highlight the active VPC constant (gold) inside the green result display.
+  // The VPC value is read from the constants panel's active indicator.
+  const vpcEl  = document.getElementById('active-const-value');
+  const vpcVal = vpcEl ? vpcEl.textContent.trim() : '';
+  const display = document.getElementById('number-display');
+  if (display && vpcVal && vpcVal !== '—' && _resultFull.includes(vpcVal)) {
+    const idx    = _resultFull.indexOf(vpcVal);
+    const before = _resultFull.slice(0, idx);
+    const after  = _resultFull.slice(idx + vpcVal.length);
+    display.innerHTML =
+      before +
+      `<span class="vpc-highlight">${vpcVal}</span>` +
+      after;
+  }
 }
 
 /* ============================================================
