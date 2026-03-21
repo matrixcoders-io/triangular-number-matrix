@@ -155,7 +155,7 @@ function onNumberInput(e) {
     if (isRepdigit) {
       metaEl.textContent = `${length.toLocaleString()} digits · repdigit ${digit}`;
     } else if (e.target.value.trim()) {
-      metaEl.textContent = `${e.target.value.trim().length.toLocaleString()} chars`;
+      metaEl.textContent = `${e.target.value.trim().length.toLocaleString()} digits`;
     } else {
       metaEl.textContent = '';
     }
@@ -252,7 +252,7 @@ function initFileBrowser() {
               if (trimmed.length > INPUT_DISPLAY_CAP) {
                 const metaEl = document.getElementById('input-char-count');
                 if (metaEl) metaEl.textContent =
-                  `${trimmed.length.toLocaleString()} digits · showing first ${INPUT_DISPLAY_CAP.toLocaleString()}`;
+                  `${trimmed.length.toLocaleString()} digits · showing ${INPUT_DISPLAY_CAP.toLocaleString()} digits`;
               }
             }
           } else {

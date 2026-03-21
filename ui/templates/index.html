@@ -30,7 +30,7 @@
         <div class="input-label">
           <span>Input Number
             <span class="input-meta" id="input-char-count">
-              {% if num1 %}{{ num1 | length | string }} chars{% endif %}
+              {% if num1 %}{{ num1 | length | string }} characters{% endif %}
             </span>
           </span>
           <span id="input-file-badge" class="input-file-badge">{% if default_file %}◫ {{ default_file }}{% endif %}</span>
@@ -366,7 +366,7 @@
     wrap.innerHTML = `
       <table class="file-table">
         <thead><tr>
-          <th>Time</th><th>Method</th><th>Digit</th><th>Input len</th><th>Output chars</th><th>Elapsed</th>
+          <th>Time</th><th>Method</th><th>Digit Family</th><th>Input Number Length</th><th>Output Number Length</th><th>Elapsed</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>`;

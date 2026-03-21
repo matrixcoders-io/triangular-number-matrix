@@ -386,7 +386,7 @@ body {
 
 .input-meta {
   font-size: 0.7rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-family: var(--font-mono);
   text-transform: none;
   letter-spacing: 0;

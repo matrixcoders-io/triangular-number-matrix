@@ -70,7 +70,7 @@ def list_number_files() -> List[dict]:
     try:
         names = sorted(
             f for f in os.listdir(NUMBERS_DIR)
-            if os.path.isfile(os.path.join(NUMBERS_DIR, f))
+            if os.path.isfile(os.path.join(NUMBERS_DIR, f)) and not f.startswith('.')
         )
         result = []
         for name in names:
