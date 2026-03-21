@@ -16,3 +16,15 @@ WINDOWS_JSON   = os.path.join(CONFIGS_DIR, "windows.json")
 # --- Calculator defaults ---
 DEFAULT_CHUNK_CHARS = 8_388_608  # 8 MiB per chunk for streaming/memory modes
 TN_OUT_FILE = os.path.join(TN_FILES_DIR, "tn-file.txt")
+
+# ---------------------------------------------------------------------------
+# UI file transfer options
+# ---------------------------------------------------------------------------
+# Set UI_HTTP_FILE_TRANSFER=false at startup to disable HTTP mode entirely.
+# The radio toggle will be hidden and all files are read server-side (disk-direct).
+UI_HTTP_FILE_TRANSFER = os.environ.get("UI_HTTP_FILE_TRANSFER", "true").lower() == "true"
+
+# Maximum number of digits allowed for HTTP transfer to the browser.
+# Files with more digits than this will force disk-direct mode automatically.
+# Override at startup: UI_HTTP_FILE_MAX_DIGITS=5000000
+UI_HTTP_FILE_MAX_DIGITS = int(os.environ.get("UI_HTTP_FILE_MAX_DIGITS", "10000000"))

@@ -21,7 +21,10 @@ from config import (
     WE_FILES_DIR,
     STAT_FILES_DIR,
     WINDOWS_JSON,
+    UI_HTTP_FILE_TRANSFER,
+    UI_HTTP_FILE_MAX_DIGITS,
 )
+from api.routes.stats import _load_history, _save_history
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +38,7 @@ calculator_bp = Blueprint("calculator", __name__)
 def read_file_content(filepath: str) -> str:
     try:
         with open(filepath, "r") as f:
-            return f.read()
+            return f.read().strip()
     except FileNotFoundError:
         return f"Error: The file {filepath} was not found."
     except Exception as e:
@@ -61,17 +64,34 @@ def calc_change(old, new) -> float:
     return ((float(new) - float(old)) / float(old)) * 100
 
 
-def list_number_files() -> List[str]:
-    """Return sorted list of filenames in the numbers directory."""
+def list_number_files() -> List[dict]:
+    """Return sorted list of file metadata dicts for the numbers directory."""
     try:
-        files = [
+        names = sorted(
             f for f in os.listdir(NUMBERS_DIR)
             if os.path.isfile(os.path.join(NUMBERS_DIR, f))
-        ]
-        return sorted(files)
+        )
+        result = []
+        for name in names:
+            path = os.path.join(NUMBERS_DIR, name)
+            size_bytes = os.path.getsize(path)
+            result.append({
+                "name": name,
+                "size_bytes": size_bytes,
+                "size_display": _human_size(size_bytes),
+            })
+        return result
     except Exception as e:
         logger.error("Failed to list number files: %s", e)
         return []
+
+
+def _human_size(n: int) -> str:
+    for unit in ("B", "KB", "MB", "GB"):
+        if n < 1024:
+            return f"{n:.0f} {unit}" if unit == "B" else f"{n:.1f} {unit}"
+        n /= 1024
+    return f"{n:.1f} TB"
 
 
 # ---------------------------------------------------------------------------
@@ -87,7 +107,7 @@ def handle_big_number_math(request_type: str):
     file_name = request.form.get("file_names", "")
     elapsed = None
     percent_change = float("0.0")
-    file_load_time = 0
+    file_load_time = "0"
 
     file_names = list_number_files()
 
@@ -95,14 +115,16 @@ def handle_big_number_math(request_type: str):
         num1 = request.form.get("num1", "").strip()
         num2 = request.form.get("num2", "").strip()
         operation = request.form.get("operation", "")
+        file_mode = request.form.get("file_mode", "disk")
 
         try:
             start_time = time.perf_counter()
 
-            if file_name:
+            # Disk-direct: read file from server, overrides textarea content
+            if file_mode == "disk" and file_name:
                 num1 = read_file_content(os.path.join(NUMBERS_DIR, file_name))
                 file_load_time = str(time.perf_counter() - start_time)
-                logger.info("Loading file from: %s/%s", NUMBERS_DIR, file_name)
+                logger.info("Loading file from disk: %s/%s", NUMBERS_DIR, file_name)
 
             if operation == "add":
                 result = ManualBigNumber(num1).add(ManualBigNumber(num2))
@@ -163,19 +185,20 @@ def handle_big_number_math(request_type: str):
                 b = TriangulaNumberMatrix("1")
                 logger.info("loaded file for tri_matrix_stream: %s s", file_load_time)
                 windows = [(int(a), int(bv)) for a, bv in load_windows_json(WINDOWS_JSON)]
-                result = b.repDigitTriangularNumberStream(
+                _stream_res = b.repDigitTriangularNumberStream(
                     num1,
                     out_path=TN_OUT_FILE + "." + operation + ".txt",
                     extract_ranges=windows,
-                    collect_result=False,
+                    collect_result=True,
                 )
-                write_to_file(os.path.join(WE_FILES_DIR, "we-file.txt.tri_matrix_stream.txt"), str(result["extracted"]))
+                write_to_file(os.path.join(WE_FILES_DIR, "we-file.txt.tri_matrix_stream.txt"), str(_stream_res["extracted"]))
                 write_to_file(
                     os.path.join(STAT_FILES_DIR, "stat-file.txt.tri_matrix_stream.txt"),
-                    "{repdigit: " + str(result["repdigit"]) + ", repdigit_length: " + str(result["repdigit_length"]) +
-                    ", generated_chars: " + str(result["generated_chars"]) + ", file_load_time: " + file_load_time +
-                    ", elapsed_seconds: " + str(result["elapsed_seconds"]) + ", total_elapsed: " + str(time.perf_counter() - start_time) + "}"
+                    "{repdigit: " + str(_stream_res["repdigit"]) + ", repdigit_length: " + str(_stream_res["repdigit_length"]) +
+                    ", generated_chars: " + str(_stream_res["generated_chars"]) + ", file_load_time: " + file_load_time +
+                    ", elapsed_seconds: " + str(_stream_res["elapsed_seconds"]) + ", total_elapsed: " + str(time.perf_counter() - start_time) + "}"
                 )
+                result = _stream_res.get("result", "")
                 logger.info("rep digit calculation complete (tri_matrix_stream): %.6f s", time.perf_counter() - start_time)
                 result = b.increment_by_gmpy_count(num1, result, num2) if num2 not in (None, "", " ") else result
 
@@ -183,15 +206,16 @@ def handle_big_number_math(request_type: str):
                 b = TriangulaNumberMatrix("1")
                 logger.info("loaded file for tri_matrix_memory: %s s", file_load_time)
                 windows = [(int(a), int(bv)) for a, bv in load_windows_json(WINDOWS_JSON)]
-                result = b.repDigitTriangularNumberMemory(num1, extract_ranges=windows, collect_result=False)
-                write_to_file(os.path.join(TN_OUT_FILE + ".tri_matrix_memory.txt"), str(result.get("result", "")))
-                write_to_file(os.path.join(WE_FILES_DIR, "we-file.txt.tri_matrix_memory.txt"), str(result["extracted"]))
+                _mem_res = b.repDigitTriangularNumberMemory(num1, extract_ranges=windows, collect_result=True)
+                write_to_file(os.path.join(TN_OUT_FILE + ".tri_matrix_memory.txt"), str(_mem_res.get("result", "")))
+                write_to_file(os.path.join(WE_FILES_DIR, "we-file.txt.tri_matrix_memory.txt"), str(_mem_res["extracted"]))
                 write_to_file(
                     os.path.join(STAT_FILES_DIR, "stat-file.txt.tri_matrix_memory.txt"),
-                    "{repdigit: " + str(result["repdigit"]) + ", repdigit_length: " + str(result["repdigit_length"]) +
-                    ", generated_chars: " + str(result["generated_chars"]) + ", file_load_time: " + file_load_time +
-                    ", elapsed_seconds: " + str(result["elapsed_seconds"]) + ", total_elapsed: " + str(time.perf_counter() - start_time) + "}"
+                    "{repdigit: " + str(_mem_res["repdigit"]) + ", repdigit_length: " + str(_mem_res["repdigit_length"]) +
+                    ", generated_chars: " + str(_mem_res["generated_chars"]) + ", file_load_time: " + file_load_time +
+                    ", elapsed_seconds: " + str(_mem_res["elapsed_seconds"]) + ", total_elapsed: " + str(time.perf_counter() - start_time) + "}"
                 )
+                result = _mem_res.get("result", "")
                 logger.info("rep digit calculation complete (tri_matrix_memory): %.6f s", time.perf_counter() - start_time)
                 result = b.increment_by_gmpy_count(num1, result, num2) if num2 not in (None, "", " ") else result
 
@@ -224,6 +248,24 @@ def handle_big_number_math(request_type: str):
             except Exception:
                 percent_change = 0.0
 
+            # Append to run history
+            if result is not None and error is None:
+                repdigit = num1[0] if num1 else ""
+                result_str = str(result)
+                history = _load_history()
+                history.append({
+                    "ts":           time.strftime("%Y-%m-%dT%H:%M:%S"),
+                    "method":       operation,
+                    "repdigit":     repdigit,
+                    "length":       len(num1),
+                    "result_chars": len(result_str),
+                    "elapsed":      round(elapsed, 6),
+                })
+                try:
+                    _save_history(history)
+                except Exception as he:
+                    logger.warning("Could not save run history: %s", he)
+
         except Exception as e:
             logger.error("Error during operation %s: %s", operation, e, exc_info=True)
             error = str(e)
@@ -232,9 +274,15 @@ def handle_big_number_math(request_type: str):
         logger.info("API request operation: %s", operation)
         return Response("Elapsed: " + str(elapsed) + " seconds. ", status=200, mimetype="text/plain")
 
-    return render_template(
-        "index.html",
-        result=result,
+    # Always ensure result is a string (never a dict) and cap display at 10 000 chars
+    DISPLAY_CAP = 10_000
+    result_str = str(result) if result is not None else None
+    result_total_chars = len(result_str) if result_str else 0
+    result_preview = result_str[:DISPLAY_CAP] if result_str else None
+
+    template_vars = dict(
+        result=result_preview,
+        result_total_chars=result_total_chars,
         error=error,
         num1=num1,
         num2=num2,
@@ -243,16 +291,30 @@ def handle_big_number_math(request_type: str):
         elapsed_display=elapsed,
         percent_change=percent_change,
         file_names=file_names,
+        ui_http_enabled=UI_HTTP_FILE_TRANSFER,
+        ui_http_max_digits=UI_HTTP_FILE_MAX_DIGITS,
     )
+
+    # HTMX partial swap — return only the result panel fragment
+    if request_type == "HTMX":
+        return render_template("partials/result_panel.html", **template_vars)
+
+    return render_template("index.html", **template_vars)
 
 
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
 
-@calculator_bp.route("/", methods=["GET", "POST"])
+@calculator_bp.route("/", methods=["GET"])
 def index():
     return handle_big_number_math("WEB")
+
+
+@calculator_bp.route("/calc", methods=["POST"])
+def calc():
+    """HTMX endpoint — returns the result panel partial only."""
+    return handle_big_number_math("HTMX")
 
 
 @calculator_bp.route("/rep-digit-math", methods=["GET", "POST"])

@@ -1,125 +1,433 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Triangular Big Number Calculator</title>
-    <style>
-        textarea {
-            width: 100%;
-            height: 100px;
-            font-size: 16px;
-            resize: both;
-            white-space: pre-wrap;       /* Wraps long lines */
-            word-wrap: break-word;       /* Break long words if needed */
-            overflow-wrap: break-word;
-        }
-        .field {
-            margin-bottom: 20px;
-        }
-        .file-input {
-            margin-top: 5px;
-        }
-    </style>
-</head>
-<body>
-    <h1>Triangular Big Number Calculator</h1>
-    <form method="post" enctype="multipart/form-data">
-        <table style="width: 100%; border: 1px solid black; margin: 0; padding: 0;" >
-            <tr  style="background-color: #f8f2d7;">
+{% extends "base.html" %}
+
+{% block title %}Triangular Number Matrix — Calculator{% endblock %}
+
+{% block content %}
+
+{# ══════════════════════════════════════════════════════════════════
+   TOP GRID: Calculator form (left) + Constants (right)
+   ══════════════════════════════════════════════════════════════════ #}
+<div class="top-grid">
+
+  {# ─── CALCULATOR PANEL ─── #}
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title"><span class="panel-title-icon">⬡</span>Calculator</span>
+      <span style="font-size:0.72rem; color: var(--text-muted);">Repdigit Triangular Number Engine</span>
+    </div>
+    <div class="panel-body">
+      <form
+        hx-post="/calc"
+        hx-target="#result-panel"
+        hx-swap="innerHTML"
+        hx-indicator=".btn-calculate"
+      >
+        {# Hidden field carries selected filename for disk-direct mode #}
+        <input type="hidden" name="file_names" id="file-name-hidden" value="">
+        {# Mirrors the current file_mode radio selection into the form POST #}
+        <input type="hidden" name="file_mode"  id="file-mode-hidden" value="disk">
+
+        <div class="input-label">
+          Input Number
+          <span class="input-meta" id="input-char-count">
+            {% if num1 %}{{ num1 | length | string }} chars{% endif %}
+          </span>
+        </div>
+        <textarea
+          class="number-textarea"
+          name="num1"
+          id="number-input"
+          placeholder="Paste a repdigit number — or click Use in the File Library below…"
+          rows="5"
+        >{{ num1 or '' }}</textarea>
+
+        <div style="margin-top: 12px;">
+          <div class="input-label">Increment (optional)</div>
+          <input
+            class="input-control"
+            type="text"
+            name="num2"
+            id="num2"
+            value="{{ num2 or '' }}"
+            placeholder="0"
+            style="max-width: 200px;"
+          >
+        </div>
+
+        <div class="form-group" style="margin-top: 14px;">
+          <label class="form-label" for="operation">Method</label>
+          <select class="select-control" name="operation" id="operation">
+            <option value="tri_matrix"
+              {% if selected_operation == 'tri_matrix' %}selected{% endif %}>
+              Matrix (in-memory)
+            </option>
+            <option value="tri_matrix_memory"
+              {% if selected_operation == 'tri_matrix_memory' %}selected{% endif %}>
+              Matrix Memory (chunked)
+            </option>
+            <option value="tri_matrix_stream"
+              {% if selected_operation == 'tri_matrix_stream' %}selected{% endif %}>
+              Matrix Stream (disk write)
+            </option>
+            <option value="tri_matrix_random"
+              {% if selected_operation == 'tri_matrix_random' %}selected{% endif %}>
+              Matrix Random (shortform b=…,l=…,n=…)
+            </option>
+            <option value="tri_div_gmpy2_formula"
+              {% if selected_operation == 'tri_div_gmpy2_formula' %}selected{% endif %}>
+              Division gmpy2 (baseline)
+            </option>
+            <option value="tri_div_simpy_formula"
+              {% if selected_operation == 'tri_div_simpy_formula' %}selected{% endif %}>
+              Division sympy
+            </option>
+          </select>
+        </div>
+
+        <button class="btn-calculate" type="submit">
+          <span class="btn-triangle">▲</span> Calculate Triangular Number
+        </button>
+        <div class="loading-bar"></div>
+      </form>
+    </div>
+  </div>{# /calculator panel #}
+
+
+  {# ─── CONSTANTS PANEL ─── #}
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title"><span class="panel-title-icon">◈</span>Matrix Constants</span>
+      <span style="font-size:0.72rem; color: var(--text-muted);">vpc · hpl · hpr</span>
+    </div>
+    <div class="panel-body">
+
+      {# ── Number Family ── #}
+      <div class="constants-section-label">Number Family</div>
+      <div class="digit-selector">
+        {% for d in range(1, 10) %}
+        <button class="digit-btn {% if loop.first %}active{% endif %}" type="button" data-digit="{{ d }}">{{ d }}</button>
+        {% endfor %}
+      </div>
+
+      {# ── Vertical Constants grid with Digital Root labels ── #}
+      <div class="constants-meta-row">
+        <span class="vc-col-header">Vertical Constants</span>
+        <span class="dr-col-header">Digital Root</span>
+      </div>
+      <div class="vpc-grid">
+        {% for i in range(1, 10) %}
+        <div class="vpc-item" data-key="vpc{{ i }}">
+          <div class="vpc-label">{{ i }}</div>
+          <div class="vpc-value">—</div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="patterns-row">
+        <div class="pattern-item">
+          <div class="pattern-label">Left Horizontal Pattern</div>
+          <div class="pattern-value" id="const-hpl">—</div>
+        </div>
+        <div class="pattern-item">
+          <div class="pattern-label">Right Horizontal Pattern</div>
+          <div class="pattern-value" id="const-hpr">—</div>
+        </div>
+      </div>
+
+      <div class="constant-badges">
+        <span class="badge badge-lc"  id="badge-lc">lc = —</span>
+        <span class="badge badge-rpr" id="badge-rpr">rpr = —</span>
+      </div>
+
+      <div class="active-indicator">
+        <div class="active-indicator-row">
+          <div class="active-indicator-col">
+            <div class="active-indicator-label">Active Constant</div>
+            <div class="active-indicator-value" id="active-const-value">—</div>
+          </div>
+          <div class="active-indicator-col">
+            <div class="active-indicator-label">Digital Root</div>
+            <div class="active-dr-value" id="active-dr-value">—</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>{# /constants panel #}
+
+</div>{# /top-grid #}
+
+
+{# ══════════════════════════════════════════════════════════════════
+   RESULT PANEL
+   ══════════════════════════════════════════════════════════════════ #}
+<div class="panel result-panel">
+  <div class="panel-header">
+    <span class="panel-title"><span class="panel-title-icon">⊕</span>Result</span>
+    <span style="font-size:0.72rem; color: var(--text-muted);">Triangular Number Output</span>
+  </div>
+  <div id="result-panel">
+    {% include "partials/result_panel.html" %}
+  </div>
+</div>
+
+
+{# ══════════════════════════════════════════════════════════════════
+   FILE LIBRARY (scrollable)
+   ══════════════════════════════════════════════════════════════════ #}
+<div class="panel">
+  <div class="panel-header">
+    <span class="panel-title"><span class="panel-title-icon">◫</span>File Library</span>
+    <span style="font-size:0.72rem; color: var(--text-muted);">{{ file_names | length }} files · click Use to load</span>
+  </div>
+  <div class="panel-body" style="padding: 0;">
+    <div style="max-height: 290px; overflow-y: auto;">
+      <table class="file-table">
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Size</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for f in file_names %}
+          <tr>
+            <td><span class="file-name">{{ f.name }}</span></td>
+            <td><span class="file-size">{{ f.size_display }}</span></td>
             <td>
-                <div class="field">
-                    <label><b>Number (n):</b></label><br>
-                    <textarea name="num1" id="num1" placeholder="Enter REP-DIGIT number or select REP-DIGIT file from the library below">{{ num1 or '' }}</textarea><br>
-                    <!-- <input class="file-input" type="file" id="file1" accept=".txt"> -->
-                    <!-- <input type="checkbox" id="filesource" name="filesource" value="local">Typed Local File Name (for large files) -->
-                    <select id="file_names" name="file_names">
-                        <option value="">Select a file...</option>
-                        {% for file in file_names %}
-                            <option value="{{ file }}">{{ file }}</option>
-                        {% endfor %}
-                    </select>
-                    <b style="color: green;">Step (1)</b> Select the file from a library to know it's triangular number.
-                </div>
-                </td>
-                <td>
-                <div class="field">
-                    <label><b>Increment:</b></label> Number of times to increament after REP-DIGIT value is calculated<br>
-                    <textarea name="num2" id="num2" placeholder="Enter or upload second big number">{{ num2 or '0' }}</textarea><br>
-                    <!-- <input class="file-input" type="file" id="file2" accept=".txt"> -->
-                    <button onclick="eraseText()">Erase Number</button><b style="color: green;"> Step (4)</b> erase number to run next number.
-                </div>
-                </td>
-            </tr>
-        
-            <tr style="background-color: #e6e6e6;">
-                <td>
-                <div class="field">
-                    <label><b>Operation:</b></label><br>
-                    <select name="operation">
-                        <!--
-                        <option value="add" {% if selected_operation == 'add' %}selected{% endif %}>Addition</option>
-                        <option value="subtract" {% if selected_operation == 'subtract' %}selected{% endif %}>Subtraction</option>
-                        <option value="multiply" {% if selected_operation == 'multiply' %}selected{% endif %}>Multiplication</option>
-                        <option value="divide" {% if selected_operation == 'divide' %}selected{% endif %}>Division</option> 
-                        <option value="tri_add" {% if selected_operation == 'tri_add' %}selected{% endif %}>Triangular Number using Addition</option>
-                        <option value="tri_formula" {% if selected_operation == 'tri_formula' %}selected{% endif %}>Triangular Number by Hand</option> -->
-                        <option value="tri_div_simpy_formula" {% if selected_operation == 'tri_div_simpy_formula' %}selected{% endif %}>Triangular Number by Division sympy</option>
-                        <option value="tri_div_gmpy2_formula" {% if selected_operation == 'tri_div_gmpy2_formula' %}selected{% endif %}>Triangular Number by Division gmpy2</option>
-                        <option value="tri_matrix" {% if selected_operation == 'tri_matrix' %}selected{% endif %}>Triangular Number using Matrix</option>
-                    </select>
-                    <b style="color: green;">Step (2)</b> Select which Traingular Number method to use for calculations.
-                </div>
+              <button class="btn-use" type="button" data-filename="{{ f.name }}">Use</button>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="3" style="color: var(--text-muted); font-size: 0.8rem; padding: 12px 10px;">
+              No files found in static/numbers/
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
 
-                <button type="submit">Calculate</button><b style="color: green;"> Step (3)</b> Click "Calculate" button to calculate triangular number
-                </td>
-                <td>
-            {% if result %}
-                <b style="font-size: 25px;">Result: </b>Elapsed Time: <span id="elapsed_display" style="color: red;">{{ '%.6f' % elapsed }} seconds.</span> <input type="hidden" name="elapsed" id="elapsed" value="{{ '%.6f' % elapsed }}" /> Percent Change: <span id="percent_change" style="color: green;">{{ '%.6f' % percent_change }} %.</span> 
-            {% elif error %}
-                <h2>Error:</h2>
-                <p style="color: red;">{{ error }}</p>
-            {% endif %}
-                </td>
-            </tr>
-            <tr>
-                <td colspan="2">
-                    <textarea readonly>{{ result }}</textarea>                    
-                </td>
-            </tr>
-        </table>
-        <br>
-            
-        To generate larger rep-digit files use the following numbers generator python program.<br><br>
-            <b>python3 generate_numbers.py input_file.txt output_file.txt number_of_times</b><br>
-            # Example of generating million digit file with rep-digit 1 from 1000 digit file:<br>
-            <b>python3 generate_numbers.py static/numbers/1-1k.txt static/numbers/1-1m.txt 1000</b><br>
-            # Another example from 1 million to 100 million<br>
-            <b>python3 generate_numbers.py static/numbers/1-1m.txt static/numbers/1-100m.txt 100</b><br>
-        <p style="color: rgb(255, 21, 0);"><b>WARNING</b>: If you are increasing numbers in billions or 100s of millions the results minght not show up in UI and should be checked at the terminal window.</p>
-        <h3>Example terminal output:</h3>
-             rep digit complete using Matrix: 0.0016195409698411822<br>
-             Operation complete, elapsed time: 0.0016771249938756227<br>
-    </form>
-    <script>
-        function readFile(fileId, textId) {
-            const fileInput = document.getElementById(fileId);
-            const textArea = document.getElementById(textId);
-            fileInput.addEventListener('change', () => {
-                const file = fileInput.files[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    textArea.value = e.target.result.trim();
-                };
-                reader.readAsText(file);
-            });
-        }
 
-        function eraseText() {
-            document.getElementById("num1").value = "";
-        }
-        // readFile('file1', 'num1');
-        // readFile('file2', 'num2');
-        
-    </script>
-</body>
-</html>
+{# ══════════════════════════════════════════════════════════════════
+   RUN HISTORY (collapsible)
+   ══════════════════════════════════════════════════════════════════ #}
+<div class="panel">
+  <div class="panel-header">
+    <span class="panel-title"><span class="panel-title-icon">⟳</span>Run History</span>
+    <button
+      class="collapsible-toggle btn-nav"
+      type="button"
+      data-target="history-body"
+      aria-expanded="true"
+    ><span class="collapse-icon" style="display:inline-block; transition: transform 0.2s;">▼</span></button>
+  </div>
+  <div id="history-body">
+    <div class="panel-body">
+      <div
+        id="history-table-wrap"
+        hx-get="/stats/history"
+        hx-trigger="load, calcDone from:body"
+        hx-swap="innerHTML"
+      ><span style="color: var(--text-muted); font-size: 0.82rem;">Loading…</span></div>
+    </div>
+  </div>
+</div>
+
+
+{# ══════════════════════════════════════════════════════════════════
+   LAB — Test Suite (collapsible)
+   ══════════════════════════════════════════════════════════════════ #}
+<div class="panel">
+  <div class="panel-header">
+    <span class="panel-title"><span class="panel-title-icon">⚗</span>Lab — Test Suite</span>
+    <div style="display:flex; gap:10px; align-items:center;">
+      <button
+        class="btn-nav"
+        type="button"
+        hx-post="/lab/run-tests"
+        hx-target="#lab-output"
+        hx-swap="innerHTML"
+        hx-indicator="#lab-spinner"
+      >▶ Run Tests</button>
+      <span id="lab-spinner" class="htmx-indicator" style="color: var(--cyan); font-size: 0.8rem;">running…</span>
+      <button
+        class="collapsible-toggle btn-nav"
+        type="button"
+        data-target="lab-body"
+        aria-expanded="true"
+      ><span class="collapse-icon" style="display:inline-block; transition: transform 0.2s;">▼</span></button>
+    </div>
+  </div>
+  <div id="lab-body">
+    <div class="panel-body">
+      <div id="lab-output" style="
+        background: var(--bg-surface);
+        border: 1px solid var(--border-dim);
+        border-radius: var(--radius);
+        padding: 14px 16px;
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--text-secondary);
+        min-height: 60px;
+        max-height: 340px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+      ">Click "Run Tests" to execute the test suite.</div>
+      <div style="margin-top: 12px; font-size: 0.75rem; color: var(--text-muted);">
+        ⚠ BUG-001: digit-8 constant selection off-by-1 for 999-digit input — marked xfail, awaiting math research review.
+      </div>
+    </div>
+  </div>
+</div>
+
+
+{# ══════════════════════════════════════════════════════════════════
+   FILE INPUT MODE (configuration, below Lab)
+   Only shown if HTTP transfer is enabled in startup config.
+   ══════════════════════════════════════════════════════════════════ #}
+<div class="panel">
+  <div class="panel-header">
+    <span class="panel-title"><span class="panel-title-icon">⚙</span>File Input Mode</span>
+    <span style="font-size:0.72rem; color: var(--text-muted);">
+      Controls how "Use" loads files — configurable at startup via env vars
+    </span>
+  </div>
+  <div class="panel-body">
+    <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-start;">
+
+      <label class="file-mode-option" style="flex:1; min-width:180px;">
+        <input type="radio" name="ui_file_mode" value="disk" id="mode-disk" checked>
+        <span class="file-mode-text">
+          <span class="file-mode-name">Disk-Direct</span>
+          <span class="file-mode-desc">Flask reads from server disk on Calculate — no size limit, file content shown as preview only</span>
+        </span>
+      </label>
+
+      {% if ui_http_enabled %}
+      <label class="file-mode-option" style="flex:1; min-width:180px;">
+        <input type="radio" name="ui_file_mode" value="http" id="mode-http">
+        <span class="file-mode-text">
+          <span class="file-mode-name">HTTP Transfer</span>
+          <span class="file-mode-desc">File content sent to browser on Use — max {{ '{:,}'.format(ui_http_max_digits) }} digits<br>
+            <span style="color:var(--text-muted);">Disable at startup: <code style="font-size:0.68rem;">UI_HTTP_FILE_TRANSFER=false</code></span>
+          </span>
+        </span>
+      </label>
+      {% else %}
+      <div style="font-size:0.78rem; color:var(--text-muted); align-self:center;">
+        HTTP transfer disabled — set <code style="font-size:0.75rem;">UI_HTTP_FILE_TRANSFER=true</code> at startup to enable.
+      </div>
+      {% endif %}
+
+    </div>
+
+    <div style="margin-top:10px; font-size:0.72rem; color:var(--text-muted); line-height:1.6;">
+      Startup env vars:
+      <code style="color:var(--cyan);">UI_HTTP_FILE_TRANSFER=true|false</code> &nbsp;·&nbsp;
+      <code style="color:var(--cyan);">UI_HTTP_FILE_MAX_DIGITS=10000000</code>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+
+{% block scripts_extra %}
+<script>
+  // ── Sync the ui_file_mode radio into the form hidden field ──────
+  // The calculator form uses #file-mode-hidden (not the radio directly,
+  // since the radio is outside the form).
+  document.querySelectorAll('input[name="ui_file_mode"]').forEach(function(radio) {
+    radio.addEventListener('change', function() {
+      var hidden = document.getElementById('file-mode-hidden');
+      if (hidden) hidden.value = this.value;
+      // clearDiskHiddenField is defined in app.js
+      if (this.value === 'http' && typeof clearDiskHiddenField === 'function') {
+        clearDiskHiddenField();
+      }
+    });
+  });
+
+  // ── History table renderer ──────────────────────────────────────
+  function renderHistoryTable(wrap, data) {
+    if (!Array.isArray(data) || data.length === 0) {
+      wrap.innerHTML = '<span style="color: var(--text-muted); font-size: 0.82rem;">No runs recorded yet. Run a calculation to see benchmarks here.</span>';
+      return;
+    }
+    const rows = data.slice().reverse().map(r => `
+      <tr>
+        <td style="color:var(--text-muted);font-family:var(--font-mono);font-size:0.75rem;">${r.ts}</td>
+        <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--cyan);">${r.method}</td>
+        <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--gold);">${r.repdigit}</td>
+        <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--text-secondary);">${Number(r.length).toLocaleString()}</td>
+        <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--green);">${Number(r.result_chars).toLocaleString()}</td>
+        <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--amber);">${r.elapsed.toFixed(4)}s</td>
+      </tr>`).join('');
+    wrap.innerHTML = `
+      <table class="file-table">
+        <thead><tr>
+          <th>Time</th><th>Method</th><th>Digit</th><th>Input len</th><th>Output chars</th><th>Elapsed</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
+  // ── HTMX swap handlers ──────────────────────────────────────────
+  document.body.addEventListener('htmx:afterSwap', function(e) {
+    const id = e.detail.target && e.detail.target.id;
+
+    if (id === 'history-table-wrap') {
+      try {
+        const data = JSON.parse(e.detail.target.innerText);
+        renderHistoryTable(e.detail.target, data);
+      } catch(_) {}
+    }
+
+    if (id === 'result-panel') {
+      if (typeof onResultSwap === 'function') onResultSwap();
+      const display = document.getElementById('number-display');
+      if (display) {
+        display.classList.add('htmx-added');
+        setTimeout(() => display.classList.remove('htmx-added'), 600);
+      }
+      document.body.dispatchEvent(new Event('calcDone'));
+    }
+
+    if (id === 'lab-output') {
+      try {
+        const data = JSON.parse(e.detail.target.innerText);
+        const escapeHtml = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        const lines = (data.output || '').split('\n').map(line => {
+          const safe = escapeHtml(line);
+          if (line.includes(' PASSED'))  return `<span style="color:var(--green);">${safe}</span>`;
+          if (line.includes(' FAILED'))  return `<span style="color:var(--red);">${safe}</span>`;
+          if (line.includes(' XFAIL') || line.includes(' xfail')) return `<span style="color:var(--amber);">${safe}</span>`;
+          if (line.includes(' ERROR'))   return `<span style="color:var(--red);">${safe}</span>`;
+          return safe;
+        });
+        const summary = `Passed: <b style="color:var(--green)">${data.passed}</b>&nbsp;&nbsp;Failed: <b style="color:var(--red)">${data.failed}</b>&nbsp;&nbsp;XFail: <b style="color:var(--amber)">${data.xfailed}</b>`;
+        e.detail.target.innerHTML = `<div style="margin-bottom:10px;font-size:0.82rem;">${summary}</div><pre style="margin:0;">${lines.join('\n')}</pre>`;
+      } catch(_) {}
+    }
+  });
+
+  // ── Calculate button label ──────────────────────────────────────
+  document.body.addEventListener('htmx:beforeRequest', function(e) {
+    if (e.detail.elt && e.detail.elt.closest('form[hx-target="#result-panel"]')) {
+      const btn = document.querySelector('.btn-calculate');
+      if (btn) btn.innerHTML = '⏳ Computing…';
+    }
+  });
+  document.body.addEventListener('htmx:afterRequest', function(e) {
+    if (e.detail.elt && e.detail.elt.closest('form[hx-target="#result-panel"]')) {
+      const btn = document.querySelector('.btn-calculate');
+      if (btn) btn.innerHTML = '<span class="btn-triangle">▲</span> Calculate Triangular Number';
+    }
+  });
+</script>
+{% endblock %}
