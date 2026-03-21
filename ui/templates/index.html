@@ -28,10 +28,12 @@
         <input type="hidden" name="file_mode"  id="file-mode-hidden" value="disk">
 
         <div class="input-label">
-          Input Number
-          <span class="input-meta" id="input-char-count">
-            {% if num1 %}{{ num1 | length | string }} chars{% endif %}
+          <span>Input Number
+            <span class="input-meta" id="input-char-count">
+              {% if num1 %}{{ num1 | length | string }} chars{% endif %}
+            </span>
           </span>
+          <span id="input-file-badge" class="input-file-badge">{% if default_file %}◫ {{ default_file }}{% endif %}</span>
         </div>
         <textarea
           class="number-textarea"
@@ -109,7 +111,6 @@
   <div class="panel">
     <div class="panel-header">
       <span class="panel-title"><span class="panel-title-icon">◈</span>Matrix Constants</span>
-      <span class="panel-subtitle">vpc · hpl · hpr</span>
     </div>
     <div class="panel-body">
 
@@ -147,8 +148,8 @@
       </div>
 
       <div class="constant-badges">
-        <span class="badge badge-lc"  id="badge-lc">lc = —</span>
-        <span class="badge badge-rpr" id="badge-rpr">rpr = —</span>
+        <span class="badge badge-lc"  id="badge-lc">—</span>
+        <span class="badge badge-rpr" id="badge-rpr">—</span>
       </div>
 
       <div class="active-indicator">
@@ -190,11 +191,11 @@
         </thead>
         <tbody>
           {% for f in file_names %}
-          <tr>
+          <tr{% if f.name == default_file %} class="selected"{% endif %}>
             <td><span class="file-name">{{ f.name }}</span></td>
             <td><span class="file-size">{{ f.size_display }}</span></td>
             <td>
-              <button class="btn-use" type="button" data-filename="{{ f.name }}">Use</button>
+              <button class="btn-use{% if f.name == default_file %} active{% endif %}" type="button" data-filename="{{ f.name }}">Use</button>
             </td>
           </tr>
           {% else %}
@@ -277,9 +278,6 @@
         overflow-y: auto;
         white-space: pre-wrap;
       ">Click "Run Tests" to execute the test suite.</div>
-      <div style="margin-top: 12px; font-size: 0.75rem; color: var(--text-muted);">
-        ⚠ BUG-001: digit-8 constant selection off-by-1 for 999-digit input — marked xfail, awaiting math research review.
-      </div>
     </div>
   </div>
 </div>

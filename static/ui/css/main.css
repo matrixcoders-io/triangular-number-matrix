@@ -392,6 +392,19 @@ body {
   letter-spacing: 0;
 }
 
+.input-file-badge {
+  font-size: 0.68rem;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-dim);
+  border-radius: 4px;
+  padding: 1px 7px;
+  text-transform: none;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
 .number-textarea {
   width: 100%;
   background: var(--bg-surface);
@@ -683,7 +696,7 @@ body {
 
 .pattern-label {
   font-size: 0.65rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   margin-bottom: 3px;
@@ -717,8 +730,8 @@ body {
   font-size: 0.72rem;
   color: var(--text-secondary);
 }
-.badge.badge-lc { border-color: rgba(251,191,36,0.3); color: var(--amber); }
-.badge.badge-rpr { border-color: rgba(167,139,250,0.3); color: var(--violet); }
+.badge.badge-lc  { border-color: var(--border); color: var(--text-secondary); }
+.badge.badge-rpr { border-color: var(--border); color: var(--text-secondary); }
 
 .active-indicator {
   margin-top: 14px;
@@ -741,7 +754,7 @@ body {
   gap: 2px;
 }
 
-.active-indicator-label { color: var(--text-muted); font-size: 0.7rem; margin-bottom: 2px; }
+.active-indicator-label { color: var(--text-secondary); font-size: 0.7rem; margin-bottom: 2px; }
 
 /* Active Constant value — violet, the assembled vpc string */
 .active-indicator-value { color: var(--violet-bright); font-family: var(--font-mono); font-weight: 700; font-size: 1rem; }

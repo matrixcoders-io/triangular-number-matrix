@@ -15,7 +15,8 @@ WINDOWS_JSON   = os.path.join(CONFIGS_DIR, "windows.json")
 
 # --- Calculator defaults ---
 DEFAULT_CHUNK_CHARS = 8_388_608  # 8 MiB per chunk for streaming/memory modes
-TN_OUT_FILE = os.path.join(TN_FILES_DIR, "tn-file.txt")
+TN_OUT_FILE     = os.path.join(TN_FILES_DIR, "tn-file.txt")
+TN_LAST_RESULT  = os.path.join(TN_FILES_DIR, "tn-last-result.txt")
 
 # ---------------------------------------------------------------------------
 # UI file transfer options

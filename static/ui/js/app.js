@@ -132,8 +132,8 @@ function updateConstantsPanel(digitStr, activeVpcKey) {
   // Optional badges: lc, rpr
   const lcBadge  = document.getElementById('badge-lc');
   const rprBadge = document.getElementById('badge-rpr');
-  if (lcBadge)  lcBadge.textContent  = data.lc  ? `lc = ${data.lc}`  : '—';
-  if (rprBadge) rprBadge.textContent = data.rpr ? `rpr = ${data.rpr}` : '—';
+  if (lcBadge)  lcBadge.textContent  = data.lc  ? `— Left Pattern Padding Digit = ${data.lc}` : '';
+  if (rprBadge) rprBadge.textContent = data.rpr ? `— Right Pattern Cutoff = r - 1`             : '';
 
   // Active indicator — Active Constant (violet) and Digital Root (green) displayed separately
   const constVal = document.getElementById('active-const-value');
@@ -200,6 +200,8 @@ function setDiskHiddenField(filename) {
 
 function clearDiskHiddenField() {
   setDiskHiddenField('');
+  const badge = document.getElementById('input-file-badge');
+  if (badge) badge.textContent = '';
 }
 
 /* ============================================================
@@ -219,6 +221,10 @@ function initFileBrowser() {
       document.querySelectorAll('.btn-use.active').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
 
+      // Update selected-file badge next to Input Number label
+      const badge = document.getElementById('input-file-badge');
+      if (badge) badge.textContent = `◫ ${filename}`;
+
       // Immediately update Number Family from filename (e.g. "6-1k.txt" → digit 6).
       // Fires before the async preview fetch so the panel updates instantly on click.
       const fileDigit = filename.match(/^(\d)/)?.[1];
@@ -236,7 +242,19 @@ function initFileBrowser() {
           const resp = await fetch(`/files/preview?name=${encodeURIComponent(filename)}`);
           if (resp.ok) {
             const text = await resp.text();
-            if (ta) { ta.value = text.trim(); ta.dispatchEvent(new Event('input')); }
+            if (ta) {
+              const trimmed = text.trim();
+              ta.value = trimmed.length > INPUT_DISPLAY_CAP
+                ? trimmed.slice(0, INPUT_DISPLAY_CAP)
+                : trimmed;
+              ta.dispatchEvent(new Event('input'));
+              // If content was truncated, override the meta label with real digit count
+              if (trimmed.length > INPUT_DISPLAY_CAP) {
+                const metaEl = document.getElementById('input-char-count');
+                if (metaEl) metaEl.textContent =
+                  `${trimmed.length.toLocaleString()} digits · showing first ${INPUT_DISPLAY_CAP.toLocaleString()}`;
+              }
+            }
           } else {
             // HTTP transfer may be disabled or file too large — show a note instead
             if (ta) {
@@ -303,47 +321,110 @@ function initCollapsibles() {
    Manages a client-side view into the full result string.
    The full result is stored in a hidden element after calculation.
    ============================================================ */
-const NAV_WINDOW = 200; // chars visible at once
+const INPUT_DISPLAY_CAP = 10_000; // max chars shown in the number textarea (disk mode)
+const RESULT_WINDOW     = 10_000; // chars per Prev/Next navigation window
 
-let _resultFull    = '';
-let _resultLength  = 0;
-let _navOffset     = 0;
+let _resultFull       = '';  // content of the currently-displayed result window
+let _resultLength     = 0;   // chars in the current window
+let _resultTotalChars = 0;   // true total chars in the full result (from server)
+let _windowOffset     = 0;   // absolute start position of current window in full result
+let _navOffset        = 0;   // legacy alias — equals _windowOffset
+let _currentPage      = 1;   // 1-based page number of current window
+let _totalPages       = 0;   // total pages = ceil(_resultTotalChars / RESULT_WINDOW)
+
+/** Convert 1-based page number to byte/char offset. */
+function pageToOffset(page) { return Math.max(0, page - 1) * RESULT_WINDOW; }
+
+/** Convert byte/char offset to 1-based page number. */
+function offsetToPage(offset) { return Math.floor(offset / RESULT_WINDOW) + 1; }
 
 function initResultNav() {
-  const prevBtn  = document.getElementById('nav-prev');
-  const nextBtn  = document.getElementById('nav-next');
-  const gotoBtn  = document.getElementById('nav-goto');
-  const navInput = document.getElementById('nav-index');
-  const display  = document.getElementById('number-display');
-
-  if (!display) return;
-
-  if (prevBtn) prevBtn.addEventListener('click', () => navTo(_navOffset - NAV_WINDOW));
-  if (nextBtn) nextBtn.addEventListener('click', () => navTo(_navOffset + NAV_WINDOW));
-  if (gotoBtn) gotoBtn.addEventListener('click', () => {
-    const idx = parseInt(navInput?.value ?? '0', 10);
-    navTo(isNaN(idx) ? 0 : idx);
-  });
-  if (navInput) navInput.addEventListener('keydown', e => {
-    if (e.key === 'Enter') {
-      const idx = parseInt(navInput.value, 10);
-      navTo(isNaN(idx) ? 0 : idx);
+  // Event delegation on document — nav elements (#nav-prev, #nav-next, #nav-goto,
+  // #nav-index) live inside #result-panel which is fully replaced on every HTMX
+  // result swap.  Attaching listeners directly to those elements means they die on
+  // every swap.  Delegating to document means this runs exactly once and always works.
+  document.addEventListener('click', (e) => {
+    switch (e.target.id) {
+      case 'nav-prev':
+        if (_currentPage > 1) loadWindow(pageToOffset(_currentPage - 1));
+        break;
+      case 'nav-next':
+        if (_totalPages === 0 || _currentPage < _totalPages)
+          loadWindow(pageToOffset(_currentPage + 1));
+        break;
+      case 'nav-goto': {
+        const navInput = document.getElementById('nav-index');
+        const page = parseInt(navInput?.value ?? '1', 10);
+        if (!isNaN(page) && page >= 1) loadWindow(pageToOffset(page));
+        break;
+      }
     }
   });
 }
 
 function navTo(offset) {
-  if (!_resultFull) return;
-  _navOffset = Math.max(0, Math.min(offset, _resultLength - 1));
+  // Backward-compat wrapper — redirect to window-based navigation.
+  loadWindow(offset);
+}
+
+/**
+ * Render `text` into #number-display, applying the VPC gold highlight if the
+ * active constant appears anywhere in this window.  Called both on initial
+ * result swap and after every Prev/Next window load.
+ */
+function renderWindowContent(text) {
   const display = document.getElementById('number-display');
-  if (display && _resultLength > 0) {
-    const scrollRatio = _navOffset / _resultLength;
-    display.scrollTop = display.scrollHeight * scrollRatio;
+  if (!display) return;
+
+  const vpcEl  = document.getElementById('active-const-value');
+  const vpcVal = vpcEl ? vpcEl.textContent.trim() : '';
+
+  if (vpcVal && vpcVal !== '—' && text.includes(vpcVal)) {
+    const idx    = text.indexOf(vpcVal);
+    const before = text.slice(0, idx);
+    const after  = text.slice(idx + vpcVal.length);
+    display.innerHTML =
+      before +
+      `<span class="vpc-highlight">${vpcVal}</span>` +
+      after;
+  } else {
+    display.textContent = text;
   }
-  const navIndex = document.getElementById('nav-index');
-  if (navIndex) navIndex.value = _navOffset;
-  const navTotal = document.getElementById('nav-total');
-  if (navTotal) navTotal.textContent = `/ ${_resultLength.toLocaleString()}`;
+  display.scrollTop = 0;
+}
+
+/**
+ * Fetch a RESULT_WINDOW-sized chunk of the full result from the server,
+ * update state, and re-render the display.
+ * @param {number} offset  Absolute character position in the full result.
+ */
+async function loadWindow(offset) {
+  offset = Math.max(0, offset);
+  // If total is known, don't fetch past the end
+  if (_resultTotalChars > 0 && offset >= _resultTotalChars) return;
+
+  try {
+    const resp = await fetch(`/calc/window?offset=${offset}&length=${RESULT_WINDOW}`);
+    if (!resp.ok) return;
+    const data = await resp.json();
+
+    _windowOffset     = data.offset;
+    _resultTotalChars = data.total;
+    _totalPages       = Math.ceil(_resultTotalChars / RESULT_WINDOW);
+    _currentPage      = offsetToPage(_windowOffset);
+    _resultFull       = data.chunk;
+    _resultLength     = data.chunk.length;
+    _navOffset        = _windowOffset;
+
+    const navIndex = document.getElementById('nav-index');
+    if (navIndex) navIndex.value = _currentPage;
+    const navTotal = document.getElementById('nav-total');
+    if (navTotal) navTotal.textContent = `/ ${_totalPages.toLocaleString()} pages`;
+
+    renderWindowContent(_resultFull);
+  } catch (e) {
+    console.error('loadWindow failed:', e);
+  }
 }
 
 /**
@@ -353,30 +434,26 @@ function navTo(offset) {
 function onResultSwap() {
   const fullEl = document.getElementById('result-full');
   if (!fullEl) return;
+
+  // Seed state from the server-rendered first window (up to 10 000 chars).
   _resultFull   = fullEl.textContent;
   _resultLength = _resultFull.length;
+  _windowOffset = 0;
   _navOffset    = 0;
+  _currentPage  = 1;
 
-  // Update nav indicator.
+  // True total result length (may be larger than the 10 000-char preview).
+  const totalEl = document.getElementById('result-total-chars');
+  _resultTotalChars = totalEl ? parseInt(totalEl.textContent, 10) : _resultLength;
+  _totalPages       = _resultTotalChars > 0 ? Math.ceil(_resultTotalChars / RESULT_WINDOW) : 0;
+
   const navIndex = document.getElementById('nav-index');
-  if (navIndex) navIndex.value = 0;
+  if (navIndex) navIndex.value = 1;
   const navTotal = document.getElementById('nav-total');
-  if (navTotal) navTotal.textContent = `/ ${_resultLength.toLocaleString()}`;
+  if (navTotal) navTotal.textContent = `/ ${_totalPages.toLocaleString()} pages`;
 
-  // Highlight the active VPC constant (gold) inside the green result display.
-  // The VPC value is read from the constants panel's active indicator.
-  const vpcEl  = document.getElementById('active-const-value');
-  const vpcVal = vpcEl ? vpcEl.textContent.trim() : '';
-  const display = document.getElementById('number-display');
-  if (display && vpcVal && vpcVal !== '—' && _resultFull.includes(vpcVal)) {
-    const idx    = _resultFull.indexOf(vpcVal);
-    const before = _resultFull.slice(0, idx);
-    const after  = _resultFull.slice(idx + vpcVal.length);
-    display.innerHTML =
-      before +
-      `<span class="vpc-highlight">${vpcVal}</span>` +
-      after;
-  }
+  // Render first window with VPC gold highlight if the constant appears here.
+  renderWindowContent(_resultFull);
 }
 
 /* ============================================================
@@ -445,9 +522,16 @@ function initCopyButton() {
    KEYBOARD SHORTCUTS
    ============================================================ */
 document.addEventListener('keydown', (e) => {
-  // Alt+← / Alt+→ for result navigation
-  if (e.altKey && e.key === 'ArrowLeft')  navTo(_navOffset - NAV_WINDOW);
-  if (e.altKey && e.key === 'ArrowRight') navTo(_navOffset + NAV_WINDOW);
+  // Enter in the page-number input — same as clicking Go
+  if (e.target.id === 'nav-index' && e.key === 'Enter') {
+    const page = parseInt(e.target.value, 10);
+    if (!isNaN(page) && page >= 1) loadWindow(pageToOffset(page));
+  }
+  // Alt+← / Alt+→ for result page navigation
+  if (e.altKey && e.key === 'ArrowLeft'  && _currentPage > 1)
+    loadWindow(pageToOffset(_currentPage - 1));
+  if (e.altKey && e.key === 'ArrowRight' && (_totalPages === 0 || _currentPage < _totalPages))
+    loadWindow(pageToOffset(_currentPage + 1));
 });
 
 /* ============================================================
@@ -468,5 +552,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // On page load, if textarea already has a value (e.g. Jinja pre-fill), run detection
   if (ta && ta.value.trim()) {
     ta.dispatchEvent(new Event('input'));
+  }
+
+  // If result was pre-loaded server-side (GET /), HTMX never fires afterSwap,
+  // so we must initialize nav state here.  Without this, _resultTotalChars stays 0
+  // and Prev/Next load out-of-range chunks, blanking the display.
+  if (document.getElementById('result-full')) {
+    onResultSwap();
   }
 });

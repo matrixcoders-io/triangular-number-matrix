@@ -11,13 +11,14 @@ import json
 import logging
 from typing import List, Tuple
 
-from flask import Blueprint, request, Response, render_template
+from flask import Blueprint, request, Response, render_template, jsonify
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from core.calculator import ManualBigNumber, TriangulaNumberMatrix, ShortFormBigNumber
 from config import (
     NUMBERS_DIR,
     TN_OUT_FILE,
+    TN_LAST_RESULT,
     WE_FILES_DIR,
     STAT_FILES_DIR,
     WINDOWS_JSON,
@@ -277,6 +278,14 @@ def handle_big_number_math(request_type: str):
     # Always ensure result is a string (never a dict) and cap display at 10 000 chars
     DISPLAY_CAP = 10_000
     result_str = str(result) if result is not None else None
+
+    # Write full result to canonical file so the /calc/window endpoint can serve
+    # arbitrary chunks for large-result navigation in the UI.
+    if result_str:
+        try:
+            write_to_file(TN_LAST_RESULT, result_str)
+        except Exception as we:
+            logger.warning("Could not write last result file: %s", we)
     result_total_chars = len(result_str) if result_str else 0
     result_preview = result_str[:DISPLAY_CAP] if result_str else None
 
@@ -293,6 +302,7 @@ def handle_big_number_math(request_type: str):
         file_names=file_names,
         ui_http_enabled=UI_HTTP_FILE_TRANSFER,
         ui_http_max_digits=UI_HTTP_FILE_MAX_DIGITS,
+        default_file=None,
     )
 
     # HTMX partial swap — return only the result panel fragment
@@ -308,6 +318,41 @@ def handle_big_number_math(request_type: str):
 
 @calculator_bp.route("/", methods=["GET"])
 def index():
+    # Pre-load 1-1k.txt with a tri_matrix result so the page opens ready to use.
+    default_filename = "1-1k.txt"
+    default_path = os.path.join(NUMBERS_DIR, default_filename)
+    if os.path.isfile(default_path):
+        try:
+            num1 = read_file_content(default_path)
+            start = time.perf_counter()
+            b = TriangulaNumberMatrix("1")
+            result_str = str(b.repDigitTriangularNumber(num1))
+            elapsed = time.perf_counter() - start
+            try:
+                write_to_file(TN_LAST_RESULT, result_str)
+            except Exception:
+                pass
+            DISPLAY_CAP = 10_000
+            result_total_chars = len(result_str)
+            result_preview = result_str[:DISPLAY_CAP]
+            file_names = list_number_files()
+            return render_template("index.html",
+                result=result_preview,
+                result_total_chars=result_total_chars,
+                num1=num1,
+                num2="",
+                selected_operation="tri_matrix",
+                elapsed=elapsed,
+                elapsed_display=elapsed,
+                percent_change=0.0,
+                error=None,
+                file_names=file_names,
+                ui_http_enabled=UI_HTTP_FILE_TRANSFER,
+                ui_http_max_digits=UI_HTTP_FILE_MAX_DIGITS,
+                default_file=default_filename,
+            )
+        except Exception as e:
+            logger.warning("Default pre-load of %s failed: %s", default_filename, e)
     return handle_big_number_math("WEB")
 
 
@@ -320,3 +365,37 @@ def calc():
 @calculator_bp.route("/rep-digit-math", methods=["GET", "POST"])
 def rep_digit_math():
     return handle_big_number_math("API")
+
+
+@calculator_bp.route("/calc/window")
+def result_window():
+    """
+    Return a 10 000-char window of the last calculated result.
+    Used by the UI Prev/Next navigation to page through large results.
+    Query params:
+      offset  — start character position (default 0)
+      length  — window size, capped at 50 000 (default 10 000)
+    Response JSON: { chunk, total, offset, length }
+    """
+    try:
+        offset = max(0, int(request.args.get("offset", 0)))
+        length = min(max(1, int(request.args.get("length", 10_000))), 50_000)
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid offset or length"}), 400
+
+    try:
+        # Use seek/read so only the requested chunk is loaded — safe for files of any size.
+        # The result file contains pure ASCII digits (0–9), so bytes == chars.
+        with open(TN_LAST_RESULT, "rb") as f:
+            f.seek(0, 2)          # seek to end
+            total = f.tell()      # file size in bytes == total chars
+            if offset >= total:
+                return jsonify({"error": "offset past end of file", "total": total}), 416
+            f.seek(offset)
+            chunk = f.read(length).decode("ascii", errors="replace")
+        return jsonify({"chunk": chunk, "total": total, "offset": offset, "length": len(chunk)})
+    except FileNotFoundError:
+        return jsonify({"error": "No result available — run a calculation first"}), 404
+    except Exception as e:
+        logger.error("result_window failed: %s", e)
+        return jsonify({"error": str(e)}), 500
