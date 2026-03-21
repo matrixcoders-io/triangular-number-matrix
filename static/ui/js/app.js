@@ -105,9 +105,19 @@ function detectRepdigit(str) {
    ============================================================ */
 const vpcKeys = ['vpc1','vpc2','vpc3','vpc4','vpc5','vpc6','vpc7','vpc8','vpc9'];
 
+// Persist the last calculated active constant so digit-family browsing doesn't clear it.
+let _calcDigit     = null;  // digit family of the last calculation (e.g. '1')
+let _calcActiveKey = null;  // vpc key of the last active constant (e.g. 'vpc3')
+
 function updateConstantsPanel(digitStr, activeVpcKey) {
   const data = MATRIX[digitStr];
   if (!data) return;
+
+  // Persist the active key so digit-family browsing can restore it.
+  if (activeVpcKey) {
+    _calcDigit     = digitStr;
+    _calcActiveKey = activeVpcKey;
+  }
 
   // Update digit selector active state
   document.querySelectorAll('.digit-btn').forEach(btn => {
@@ -174,7 +184,8 @@ function initDigitSelector() {
   document.querySelectorAll('.digit-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const d = btn.dataset.digit;
-      updateConstantsPanel(d, null);
+      const key = (d === _calcDigit) ? _calcActiveKey : null;
+      updateConstantsPanel(d, key);
     });
   });
   // Default: show digit 1 on load
@@ -228,7 +239,11 @@ function initFileBrowser() {
       // Immediately update Number Family from filename (e.g. "6-1k.txt" → digit 6).
       // Fires before the async preview fetch so the panel updates instantly on click.
       const fileDigit = filename.match(/^(\d)/)?.[1];
-      if (fileDigit && MATRIX[fileDigit]) updateConstantsPanel(fileDigit, null);
+      if (fileDigit && MATRIX[fileDigit]) {
+        _calcDigit     = null;
+        _calcActiveKey = null;
+        updateConstantsPanel(fileDigit, null);
+      }
 
       const mode = getFileMode();
 

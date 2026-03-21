@@ -666,12 +666,12 @@ body {
 }
 
 .vpc-item.active {
-  border-color: var(--violet);
-  background: var(--violet-dim);
-  box-shadow: 0 0 10px var(--violet-glow);
+  border-color: var(--red);
+  background: rgba(248, 113, 113, 0.08);
+  box-shadow: 0 0 10px rgba(248, 113, 113, 0.22);
   animation: vpc-pulse 0.4s var(--ease);
 }
-.vpc-item.active .vpc-value { color: var(--violet-bright); }
+.vpc-item.active .vpc-value { color: var(--red); }
 
 @keyframes vpc-pulse {
   0% { transform: scale(0.97); }
@@ -757,7 +757,7 @@ body {
 .active-indicator-label { color: var(--text-secondary); font-size: 0.7rem; margin-bottom: 2px; }
 
 /* Active Constant value — violet, the assembled vpc string */
-.active-indicator-value { color: var(--violet-bright); font-family: var(--font-mono); font-weight: 700; font-size: 1rem; }
+.active-indicator-value { color: var(--red); font-family: var(--font-mono); font-weight: 700; font-size: 1rem; }
 
 /* Digital Root value — green, the number 1–9 that selected this constant */
 .active-dr-value { color: var(--green); font-family: var(--font-mono); font-weight: 700; font-size: 1rem; }
@@ -934,7 +934,7 @@ body {
 
 /* VPC constant highlight inside result display */
 .vpc-highlight {
-  color: var(--gold);
+  color: var(--red);
   font-weight: 700;
 }
 
