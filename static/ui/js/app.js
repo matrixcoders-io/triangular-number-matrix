@@ -669,6 +669,12 @@ function onResultSwap() {
   _resultTotalChars = totalEl ? parseInt(totalEl.textContent, 10) : _resultLength;
   _totalPages       = _resultTotalChars > 0 ? Math.ceil(_resultTotalChars / RESULT_WINDOW) : 0;
 
+  // Pyramid mode is only valid for results that fit in a single window.
+  // Auto-switch to standard so large results are immediately navigable.
+  if (_resultTotalChars > RESULT_WINDOW) {
+    _displayMode = 'standard';
+  }
+
   const navIndex = document.getElementById('nav-index');
   if (navIndex) navIndex.value = 1;
   const navTotal = document.getElementById('nav-total');
