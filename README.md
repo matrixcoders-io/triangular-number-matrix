@@ -2,6 +2,12 @@
 
 An interactive research tool for computing, visualizing, and benchmarking triangular numbers derived from repdigit inputs. Built for researchers working with the Triangular Number Matrix theory, it provides multiple computation methods, a geometric pyramid visualization with pattern highlighting, persistent run benchmarking, and an in-browser test suite.
 
+At its core, the calculator takes a repdigit number as input and computes its triangular number — the sum of all integers from 1 to that number. What makes this non-trivial at research scale is that repdigit inputs produce triangular numbers with deeply structured internal patterns: a central vertical pattern constant flanked symmetrically by repeating left and right horizontal tile patterns. These constants and patterns are not coincidental — they are the subject of the underlying theory, and this tool is built to make them observable, navigable, and measurable across inputs ranging from hundreds to billions of digits.
+
+![Full calculator view — Pyramid mode with pattern highlighting active](images/readme/full-view-calculator.png)
+
+*The full interface showing a 1,000-digit repdigit-1 input computed and rendered in Pyramid view. The vertical pattern constant sits at the apex. Left horizontal pattern tiles radiate outward in purple, right horizontal pattern tiles in amber — with fuzzy-match highlighting identifying exactly which characters differ from the expected repeating pattern. The Matrix Constants panel (right) shows the active constant and digital root. Run History and Leader Board panels are visible at the bottom.*
+
 ---
 
 ## Table of Contents
