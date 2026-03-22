@@ -610,9 +610,16 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
 
   // Colorize helpers for the partial rem slots:
   //   leftRem aligns to hpl HEAD  (hpl[0:leftRemLen])
-  //   rightRem aligns to hpr TAIL (hpr[hprLen-rightRemLen:])
-  const colorLeftRem  = () => colorizeStr(leftRemStr,  hpl.slice(0, leftRemLen),          'hpl-match');
-  const colorRightRem = () => colorizeStr(rightRemStr, hpr.slice(hprLen - rightRemLen),   'hpr-match');
+  //   rightRem aligns to the TAIL of the first full right tile (rightFull[0][-rightRemLen:]).
+  //     For pure repdigit: rightFull[0] = hpr, so this equals hpr[-rightRemLen:] (same as before).
+  //     For increment: rightFull[0] is a rotation of hpr; using its tail gives the correct
+  //     expected value for the partial slot, so only genuinely changed chars show as green.
+  const colorLeftRem  = () => colorizeStr(leftRemStr,  hpl.slice(0, leftRemLen), 'hpl-match');
+  const colorRightRem = () => colorizeStr(
+    rightRemStr,
+    (rightFull.length > 1 ? rightFull[0] : hpr).slice(hprLen - rightRemLen),
+    'hpr-match'
+  );
 
   const lines = [];
 
