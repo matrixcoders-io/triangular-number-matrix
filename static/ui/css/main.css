@@ -896,6 +896,31 @@ body {
   background: var(--cyan-dim);
 }
 
+.panel-tabs {
+  display: flex;
+  gap: 4px;
+}
+.panel-tab {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: all 0.15s;
+}
+.panel-tab.active {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  background: var(--cyan-dim);
+}
+.panel-tab:hover:not(.active) {
+  border-color: var(--border-bright);
+  color: var(--text-primary);
+}
+
 .btn-stepper {
   background: var(--bg-surface);
   border: 1px solid var(--border);

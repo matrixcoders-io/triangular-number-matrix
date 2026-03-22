@@ -25,7 +25,7 @@ from config import (
     UI_HTTP_FILE_TRANSFER,
     UI_HTTP_FILE_MAX_DIGITS,
 )
-from api.routes.stats import _load_history, _save_history
+from api.routes.stats import _load_history, _save_history, _update_leaderboard
 
 logger = logging.getLogger(__name__)
 
@@ -264,6 +264,7 @@ def handle_big_number_math(request_type: str):
                 })
                 try:
                     _save_history(history)
+                    _update_leaderboard(history[-1])
                 except Exception as he:
                     logger.warning("Could not save run history: %s", he)
 
