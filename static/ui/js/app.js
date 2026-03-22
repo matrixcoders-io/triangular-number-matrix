@@ -965,6 +965,21 @@ document.addEventListener('keydown', (e) => {
 });
 
 /* ============================================================
+   INCREMENT STEPPERS  (− / + buttons next to the Increment field)
+   ============================================================ */
+function initIncrementSteppers() {
+  function step(delta) {
+    const inp = document.getElementById('num2');
+    if (!inp) return;
+    const current = parseInt(inp.value, 10);
+    inp.value = (isNaN(current) ? 0 : current) + delta;
+    document.querySelector('.btn-calculate')?.click();
+  }
+  document.getElementById('btn-increment-dec')?.addEventListener('click', () => step(-1));
+  document.getElementById('btn-increment-inc')?.addEventListener('click', () => step(1));
+}
+
+/* ============================================================
    INIT
    ============================================================ */
 document.addEventListener('DOMContentLoaded', () => {
@@ -974,6 +989,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initResultNav();
   initCopyButton();
   initPatternToggles();
+  initIncrementSteppers();
   colorizeMethodBadges();
 
   // Wire up number textarea

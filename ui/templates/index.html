@@ -44,16 +44,21 @@
         >{{ num1 or '' }}</textarea>
 
         <div class="calc-bottom-row">
-          <div class="form-group" style="flex: 0 0 120px;">
+          <div class="form-group" style="flex: 0 0 150px;">
             <div class="input-label">Increment</div>
-            <input
-              class="input-control"
-              type="text"
-              name="num2"
-              id="num2"
-              value="{{ num2 or '' }}"
-              placeholder="0"
-            >
+            <div style="display:flex; align-items:stretch; gap:3px;">
+              <button type="button" id="btn-increment-dec" class="btn-stepper">−</button>
+              <input
+                class="input-control"
+                type="text"
+                name="num2"
+                id="num2"
+                value="{{ num2 or '' }}"
+                placeholder="0"
+                style="text-align:center; min-width:0; flex:1;"
+              >
+              <button type="button" id="btn-increment-inc" class="btn-stepper">+</button>
+            </div>
           </div>
           <div class="form-group" style="flex: 1; min-width: 0;">
             <label class="form-label" for="operation">Method</label>
