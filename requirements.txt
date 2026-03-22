@@ -5,3 +5,4 @@ gmpy2>=2.1.0
 numpy
 sympy
 pybaseconv
+pytest

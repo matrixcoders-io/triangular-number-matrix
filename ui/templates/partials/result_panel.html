@@ -1,0 +1,70 @@
+{#
+  Partial: result_panel.html
+  Variables: result (str, max 10 000 chars), result_total_chars (int, actual full length),
+             error, elapsed, percent_change, selected_operation
+#}
+
+{% if error %}
+  <div class="error-box">⚠ {{ error }}</div>
+
+{% elif result %}
+  {# ---- Stats bar ---- #}
+  <div class="result-stats-bar">
+    <div class="stat-chip">
+      <span class="stat-label">Method</span>
+      <span class="stat-value">{{ selected_operation or '—' }}</span>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-label">Output Digits</span>
+      <span class="stat-value size">{{ '{:,}'.format(result_total_chars) }}</span>
+    </div>
+    {% if elapsed %}
+    <div class="stat-chip">
+      <span class="stat-label">Elapsed</span>
+      <span class="stat-value timing">{{ '%.4f' % elapsed }}s</span>
+    </div>
+    {% endif %}
+    {% if percent_change %}
+    <div class="stat-chip">
+      <span class="stat-label">Δ vs prev</span>
+      <span class="stat-value" style="color: var(--violet);">{{ '%.2f' % percent_change }}%</span>
+    </div>
+    {% endif %}
+    {% if result_total_chars > 10000 %}
+    <div class="stat-chip">
+      <span class="stat-label" style="color: var(--amber);">⚠ showing 10,000 of {{ '{:,}'.format(result_total_chars) }} digits</span>
+    </div>
+    {% endif %}
+  </div>
+
+  {# ---- Navigation ---- #}
+  <div class="result-nav">
+    <span class="nav-label">Navigate</span>
+    <button class="btn-nav" id="nav-prev" type="button">&#8592; Prev</button>
+    <span style="font-size:0.7rem; color:var(--text-secondary); font-family:var(--font-mono);">Page</span>
+    <input class="nav-input" id="nav-index" type="number" value="1" min="1" step="1">
+    <span id="nav-total" style="font-size:0.75rem; color: var(--text-secondary);">/ — pages</span>
+    <button class="btn-nav" id="nav-goto" type="button">Go</button>
+    <button class="btn-nav" id="nav-next" type="button">Next &#8594;</button>
+    <span id="nav-chars" style="font-size:0.7rem; color:var(--text-secondary); font-family:var(--font-mono); margin-left:0.5rem;"></span>
+    <button class="btn-nav" id="btn-copy-result" type="button" style="margin-left: auto;">⎘ Copy</button>
+  </div>
+
+  {# ---- Full result (capped at 10 000 chars), JS reads for nav ---- #}
+  <pre id="result-full" style="display:none;">{{ result }}</pre>
+  {# ---- True total length — JS uses this to know full result size for window nav ---- #}
+  <span id="result-total-chars" style="display:none">{{ result_total_chars }}</span>
+
+  {# ---- Visible display window ---- #}
+  <div class="number-display-wrap">
+    <div class="number-display" id="number-display">{{ result }}</div>
+  </div>
+
+{% else %}
+  <div class="result-placeholder">
+    <div class="result-placeholder-icon">▲</div>
+    <div class="result-placeholder-text">
+      Select a number, choose a method,<br>and click Calculate.
+    </div>
+  </div>
+{% endif %}

@@ -1,0 +1,18 @@
+{
+  "tri_matrix": {
+    "ts": "2026-03-22T16:21:38",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000000,
+    "result_chars": 1999998,
+    "elapsed": 0.006227
+  },
+  "tri_matrix_stream": {
+    "ts": "2026-03-22T16:22:03",
+    "method": "tri_matrix_stream",
+    "repdigit": "1",
+    "length": 1000000,
+    "result_chars": 1999998,
+    "elapsed": 7.016189
+  }
+}

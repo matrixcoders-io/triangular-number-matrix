@@ -1,0 +1,511 @@
+{% extends "base.html" %}
+
+{% block title %}Triangular Number Matrix — Calculator{% endblock %}
+
+{% block content %}
+
+{# ══════════════════════════════════════════════════════════════════
+   TOP GRID: Calculator form (left) + Constants (right)
+   ══════════════════════════════════════════════════════════════════ #}
+<div class="top-grid">
+
+  {# ─── CALCULATOR PANEL ─── #}
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title"><span class="panel-title-icon">⬡</span>Calculator</span>
+      <span class="panel-subtitle">Repdigit Triangular Number Engine</span>
+    </div>
+    <div class="panel-body">
+      <form
+        hx-post="/calc"
+        hx-target="#result-panel"
+        hx-swap="innerHTML"
+        hx-indicator=".btn-calculate"
+      >
+        {# Hidden field carries selected filename for disk-direct mode #}
+        <input type="hidden" name="file_names" id="file-name-hidden" value="">
+        {# Mirrors the current file_mode radio selection into the form POST #}
+        <input type="hidden" name="file_mode"  id="file-mode-hidden" value="disk">
+
+        <div class="input-label">
+          <span>Input Number
+            <span class="input-meta" id="input-char-count">
+              {% if num1 %}{{ num1 | length | string }} characters{% endif %}
+            </span>
+          </span>
+          <span id="input-file-badge" class="input-file-badge">{% if default_file %}◫ {{ default_file }}{% endif %}</span>
+        </div>
+        <textarea
+          class="number-textarea"
+          name="num1"
+          id="number-input"
+          placeholder="Paste a repdigit number — or click Use in the File Library below…"
+          rows="5"
+        >{{ num1 or '' }}</textarea>
+
+        <div class="calc-bottom-row">
+          <div class="form-group" style="flex: 0 0 150px;">
+            <div class="input-label">Increment</div>
+            <div style="display:flex; align-items:stretch; gap:3px;">
+              <button type="button" id="btn-increment-dec" class="btn-stepper">−</button>
+              <input
+                class="input-control"
+                type="text"
+                name="num2"
+                id="num2"
+                value="{{ num2 or '' }}"
+                placeholder="0"
+                style="text-align:center; min-width:0; flex:1;"
+              >
+              <button type="button" id="btn-increment-inc" class="btn-stepper">+</button>
+            </div>
+          </div>
+          <div class="form-group" style="flex: 1; min-width: 0;">
+            <label class="form-label" for="operation">Method</label>
+            <select class="select-control" name="operation" id="operation">
+              <option value="tri_matrix"
+                {% if selected_operation == 'tri_matrix' %}selected{% endif %}>
+                Matrix (in-memory)
+              </option>
+              <option value="tri_matrix_memory"
+                {% if selected_operation == 'tri_matrix_memory' %}selected{% endif %}>
+                Matrix Memory (chunked)
+              </option>
+              <option value="tri_matrix_stream"
+                {% if selected_operation == 'tri_matrix_stream' %}selected{% endif %}>
+                Matrix Stream (disk write)
+              </option>
+              <option value="tri_matrix_random"
+                {% if selected_operation == 'tri_matrix_random' %}selected{% endif %}>
+                Matrix Random (shortform)
+              </option>
+              <option value="tri_div_gmpy2_formula"
+                {% if selected_operation == 'tri_div_gmpy2_formula' %}selected{% endif %}>
+                Division gmpy2 (baseline)
+              </option>
+              <option value="tri_div_simpy_formula"
+                {% if selected_operation == 'tri_div_simpy_formula' %}selected{% endif %}>
+                Division sympy
+              </option>
+            </select>
+          </div>
+          <div style="flex: 0 0 auto; display:flex; align-items:flex-end;">
+            <button class="btn-calculate" type="submit">
+              <span class="btn-triangle">▲</span> Calculate Triangular Number
+            </button>
+          </div>
+        </div>
+        <div class="loading-bar"></div>
+      </form>
+
+      {# ── Result (inset, below calculator controls) ── #}
+      <div class="result-inset">
+        <div class="result-inset-header">
+          <span><span style="opacity:0.9;">⊕</span> Result</span>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="display-mode-label">Triangular Number Output</span>
+            <div class="display-mode-switch">
+              <button class="display-mode-btn" data-mode="standard">Standard</button>
+              <button class="display-mode-btn active" data-mode="pyramid">Pyramid</button>
+            </div>
+          </div>
+        </div>
+        <div id="result-panel">
+          {% include "partials/result_panel.html" %}
+        </div>
+      </div>
+    </div>
+  </div>{# /calculator panel #}
+
+
+  {# ─── CONSTANTS PANEL ─── #}
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title"><span class="panel-title-icon">◈</span>Matrix Constants</span>
+    </div>
+    <div class="panel-body">
+
+      {# ── Number Family ── #}
+      <div class="constants-section-label">Number Family</div>
+      <div class="digit-selector">
+        {% for d in range(1, 10) %}
+        <button class="digit-btn {% if loop.first %}active{% endif %}" type="button" data-digit="{{ d }}">{{ d }}</button>
+        {% endfor %}
+      </div>
+
+      {# ── Vertical Constants grid with Digital Root labels ── #}
+      <div class="constants-meta-row">
+        <span class="vc-col-header">Vertical Constants</span>
+        <span class="dr-col-header">Digital Root</span>
+      </div>
+      <div class="vpc-grid">
+        {% for i in range(1, 10) %}
+        <div class="vpc-item" data-key="vpc{{ i }}">
+          <div class="vpc-label">{{ i }}</div>
+          <div class="vpc-value">—</div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="patterns-row">
+        <div class="pattern-item">
+          <div class="pattern-label">Left Horizontal Pattern</div>
+          <div class="pattern-value-row">
+            <div class="pattern-value" id="const-hpl">—</div>
+            <button id="toggle-hpl" class="pattern-toggle hpl" title="Highlight HPL matches in Pyramid view">OFF</button>
+          </div>
+        </div>
+        <div class="pattern-item">
+          <div class="pattern-label">Right Horizontal Pattern</div>
+          <div class="pattern-value-row">
+            <div class="pattern-value" id="const-hpr">—</div>
+            <button id="toggle-hpr" class="pattern-toggle hpr" title="Highlight HPR matches in Pyramid view">OFF</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="constant-badges">
+        <span class="badge badge-lc"  id="badge-lc">—</span>
+        <span class="badge badge-rpr" id="badge-rpr">—</span>
+      </div>
+
+      <div class="active-indicator">
+        <div class="active-indicator-row">
+          <div class="active-indicator-col">
+            <div class="active-indicator-label">Active Constant</div>
+            <div class="active-indicator-value" id="active-const-value">—</div>
+          </div>
+          <div class="active-indicator-col">
+            <div class="active-indicator-label">Digital Root</div>
+            <div class="active-dr-value" id="active-dr-value">—</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>{# /constants panel #}
+
+</div>{# /top-grid #}
+
+
+{# ══════════════════════════════════════════════════════════════════
+   FILE LIBRARY (scrollable)
+   ══════════════════════════════════════════════════════════════════ #}
+<div class="panel">
+  <div class="panel-header">
+    <span class="panel-title"><span class="panel-title-icon">◫</span>File Library</span>
+    <span class="panel-subtitle">{{ file_names | length }} files · click Use to load</span>
+  </div>
+  <div class="panel-body" style="padding: 0;">
+    <div style="max-height: 290px; overflow-y: auto;">
+      <table class="file-table">
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Size</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for f in file_names %}
+          <tr{% if f.name == default_file %} class="selected"{% endif %}>
+            <td><span class="file-name">{{ f.name }}</span></td>
+            <td><span class="file-size">{{ f.size_display }}</span></td>
+            <td>
+              <button class="btn-use{% if f.name == default_file %} active{% endif %}" type="button" data-filename="{{ f.name }}">Use</button>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="3" style="color: var(--text-muted); font-size: 0.8rem; padding: 12px 10px;">
+              No files found in static/numbers/
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+
+{# ══════════════════════════════════════════════════════════════════
+   RUN HISTORY / LEADER BOARD (collapsible, tabbed)
+   ══════════════════════════════════════════════════════════════════ #}
+<div class="panel">
+  <div class="panel-header">
+    <div class="panel-tabs">
+      <button class="panel-tab active" id="tab-history" type="button">⟳ Run History</button>
+      <button class="panel-tab" id="tab-leaderboard" type="button">⊕ Leader Board</button>
+    </div>
+    <button
+      class="collapsible-toggle btn-nav"
+      type="button"
+      data-target="history-body"
+      aria-expanded="true"
+    ><span class="collapse-icon" style="display:inline-block; transition: transform 0.2s;">▼</span></button>
+  </div>
+  <div id="history-body">
+    <div class="panel-body" style="padding: 0;">
+
+      {# ── Run History section ── #}
+      <div id="history-section">
+        <div
+          id="history-table-wrap"
+          hx-get="/stats/history"
+          hx-trigger="load, calcDone from:body"
+          hx-swap="innerHTML"
+          style="max-height: 220px; overflow-y: auto; padding: 12px 20px;"
+        ><span style="color: var(--text-secondary); font-size: 0.82rem;">Loading…</span></div>
+      </div>
+
+      {# ── Leader Board section (hidden by default) ── #}
+      <div id="leaderboard-section" style="display:none;">
+        <div
+          id="leaderboard-table-wrap"
+          hx-get="/stats/leaderboard"
+          hx-trigger="load, calcDone from:body"
+          hx-swap="innerHTML"
+          style="max-height: 220px; overflow-y: auto; padding: 12px 20px;"
+        ><span style="color: var(--text-secondary); font-size: 0.82rem;">Loading…</span></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+{# ══════════════════════════════════════════════════════════════════
+   LAB — Test Suite (collapsible)
+   ══════════════════════════════════════════════════════════════════ #}
+<div class="panel">
+  <div class="panel-header">
+    <span class="panel-title"><span class="panel-title-icon">⚗</span>Lab — Test Suite</span>
+    <div style="display:flex; gap:10px; align-items:center;">
+      <button
+        class="btn-nav"
+        type="button"
+        hx-post="/lab/run-tests"
+        hx-target="#lab-output"
+        hx-swap="innerHTML"
+        hx-indicator="#lab-spinner"
+      >▶ Run Tests</button>
+      <span id="lab-spinner" class="htmx-indicator" style="color: var(--cyan); font-size: 0.8rem;">running…</span>
+      <button
+        class="collapsible-toggle btn-nav"
+        type="button"
+        data-target="lab-body"
+        aria-expanded="true"
+      ><span class="collapse-icon" style="display:inline-block; transition: transform 0.2s;">▼</span></button>
+    </div>
+  </div>
+  <div id="lab-body">
+    <div class="panel-body">
+      <div id="lab-output" style="
+        background: var(--bg-surface);
+        border: 1px solid var(--border-dim);
+        border-radius: var(--radius);
+        padding: 14px 16px;
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--text-secondary);
+        min-height: 60px;
+        max-height: 340px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+      ">Click "Run Tests" to execute the test suite.</div>
+    </div>
+  </div>
+</div>
+
+
+{# ══════════════════════════════════════════════════════════════════
+   FILE INPUT MODE (configuration, below Lab)
+   Only shown if HTTP transfer is enabled in startup config.
+   ══════════════════════════════════════════════════════════════════ #}
+<div class="panel">
+  <div class="panel-header">
+    <span class="panel-title"><span class="panel-title-icon">⚙</span>File Input Mode</span>
+    <span class="panel-subtitle">Controls how "Use" loads files — configurable at startup via env vars</span>
+  </div>
+  <div class="panel-body">
+    <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-start;">
+
+      <label class="file-mode-option" style="flex:1; min-width:180px;">
+        <input type="radio" name="ui_file_mode" value="disk" id="mode-disk" checked>
+        <span class="file-mode-text">
+          <span class="file-mode-name">Disk-Direct</span>
+          <span class="file-mode-desc">Flask reads from server disk on Calculate — no size limit, file content shown as preview only</span>
+        </span>
+      </label>
+
+      {% if ui_http_enabled %}
+      <label class="file-mode-option" style="flex:1; min-width:180px;">
+        <input type="radio" name="ui_file_mode" value="http" id="mode-http">
+        <span class="file-mode-text">
+          <span class="file-mode-name">HTTP Transfer</span>
+          <span class="file-mode-desc">File content sent to browser on Use — max {{ '{:,}'.format(ui_http_max_digits) }} digits<br>
+            <span style="color:var(--text-muted);">Disable at startup: <code style="font-size:0.68rem;">UI_HTTP_FILE_TRANSFER=false</code></span>
+          </span>
+        </span>
+      </label>
+      {% else %}
+      <div style="font-size:0.78rem; color:var(--text-muted); align-self:center;">
+        HTTP transfer disabled — set <code style="font-size:0.75rem;">UI_HTTP_FILE_TRANSFER=true</code> at startup to enable.
+      </div>
+      {% endif %}
+
+    </div>
+
+    <div style="margin-top:10px; font-size:0.72rem; color:var(--text-muted); line-height:1.6;">
+      Startup env vars:
+      <code style="color:var(--cyan);">UI_HTTP_FILE_TRANSFER=true|false</code> &nbsp;·&nbsp;
+      <code style="color:var(--cyan);">UI_HTTP_FILE_MAX_DIGITS=10000000</code>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+
+{% block scripts_extra %}
+<script>
+  // ── Sync the ui_file_mode radio into the form hidden field ──────
+  // The calculator form uses #file-mode-hidden (not the radio directly,
+  // since the radio is outside the form).
+  document.querySelectorAll('input[name="ui_file_mode"]').forEach(function(radio) {
+    radio.addEventListener('change', function() {
+      var hidden = document.getElementById('file-mode-hidden');
+      if (hidden) hidden.value = this.value;
+      // clearDiskHiddenField is defined in app.js
+      if (this.value === 'http' && typeof clearDiskHiddenField === 'function') {
+        clearDiskHiddenField();
+      }
+    });
+  });
+
+  // ── Tab switcher: Run History / Leader Board ────────────────────
+  document.getElementById('tab-history')?.addEventListener('click', function() {
+    this.classList.add('active');
+    document.getElementById('tab-leaderboard').classList.remove('active');
+    document.getElementById('history-section').style.display = '';
+    document.getElementById('leaderboard-section').style.display = 'none';
+  });
+  document.getElementById('tab-leaderboard')?.addEventListener('click', function() {
+    this.classList.add('active');
+    document.getElementById('tab-history').classList.remove('active');
+    document.getElementById('leaderboard-section').style.display = '';
+    document.getElementById('history-section').style.display = 'none';
+  });
+
+  // ── Leaderboard renderer ─────────────────────────────────────────
+  function renderLeaderboard(wrap, data) {
+    if (!data || typeof data !== 'object' || Object.keys(data).length === 0) {
+      wrap.innerHTML = '<span style="color: var(--text-secondary); font-size: 0.82rem;">No leaderboard data yet. Run calculations to populate the leaderboard.</span>';
+      return;
+    }
+    // Sort by input length descending (highest input first)
+    const entries = Object.values(data).sort((a, b) => b.length - a.length);
+    const rows = entries.map(r => `
+      <tr>
+        <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--cyan);">${r.method}</td>
+        <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--gold);">${r.repdigit}</td>
+        <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--text-secondary);">${Number(r.length).toLocaleString()}</td>
+        <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--green);">${Number(r.result_chars).toLocaleString()}</td>
+        <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--amber);">${r.elapsed.toFixed(4)}s</td>
+        <td style="color:var(--text-secondary);font-family:var(--font-mono);font-size:0.75rem;">${r.ts}</td>
+      </tr>`).join('');
+    wrap.innerHTML = `
+      <table class="file-table">
+        <thead><tr>
+          <th>Method</th><th>Digit Family</th><th>Highest Input</th><th>Output Length</th><th>Fastest Time</th><th>Recorded</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
+  // ── History table renderer ──────────────────────────────────────
+  function renderHistoryTable(wrap, data) {
+    if (!Array.isArray(data) || data.length === 0) {
+      wrap.innerHTML = '<span style="color: var(--text-secondary); font-size: 0.82rem;">No runs recorded yet. Run a calculation to see benchmarks here.</span>';
+      return;
+    }
+    const rows = data.slice().reverse().map(r => `
+      <tr>
+        <td style="color:var(--text-secondary);font-family:var(--font-mono);font-size:0.75rem;">${r.ts}</td>
+        <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--cyan);">${r.method}</td>
+        <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--gold);">${r.repdigit}</td>
+        <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--text-secondary);">${Number(r.length).toLocaleString()}</td>
+        <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--green);">${Number(r.result_chars).toLocaleString()}</td>
+        <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--amber);">${r.elapsed.toFixed(4)}s</td>
+      </tr>`).join('');
+    wrap.innerHTML = `
+      <table class="file-table">
+        <thead><tr>
+          <th>Time</th><th>Method</th><th>Digit Family</th><th>Input Number Length</th><th>Output Number Length</th><th>Elapsed</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
+  // ── HTMX swap handlers ──────────────────────────────────────────
+  document.body.addEventListener('htmx:afterSwap', function(e) {
+    const id = e.detail.target && e.detail.target.id;
+
+    if (id === 'history-table-wrap') {
+      try {
+        const data = JSON.parse(e.detail.target.innerText);
+        renderHistoryTable(e.detail.target, data);
+      } catch(_) {}
+    }
+
+    if (id === 'leaderboard-table-wrap') {
+      try {
+        const data = JSON.parse(e.detail.target.innerText);
+        renderLeaderboard(e.detail.target, data);
+      } catch(_) {}
+    }
+
+    if (id === 'result-panel') {
+      if (typeof onResultSwap === 'function') onResultSwap();
+      const display = document.getElementById('number-display');
+      if (display) {
+        display.classList.add('htmx-added');
+        setTimeout(() => display.classList.remove('htmx-added'), 600);
+      }
+      document.body.dispatchEvent(new Event('calcDone'));
+    }
+
+    if (id === 'lab-output') {
+      try {
+        const data = JSON.parse(e.detail.target.innerText);
+        const escapeHtml = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        const lines = (data.output || '').split('\n').map(line => {
+          const safe = escapeHtml(line);
+          if (line.includes(' PASSED'))  return `<span style="color:var(--green);">${safe}</span>`;
+          if (line.includes(' FAILED'))  return `<span style="color:var(--red);">${safe}</span>`;
+          if (line.includes(' XFAIL') || line.includes(' xfail')) return `<span style="color:var(--amber);">${safe}</span>`;
+          if (line.includes(' ERROR'))   return `<span style="color:var(--red);">${safe}</span>`;
+          return safe;
+        });
+        const summary = `Passed: <b style="color:var(--green)">${data.passed}</b>&nbsp;&nbsp;Failed: <b style="color:var(--red)">${data.failed}</b>&nbsp;&nbsp;XFail: <b style="color:var(--amber)">${data.xfailed}</b>`;
+        e.detail.target.innerHTML = `<div style="margin-bottom:10px;font-size:0.82rem;">${summary}</div><pre style="margin:0;">${lines.join('\n')}</pre>`;
+      } catch(_) {}
+    }
+  });
+
+  // ── Calculate button label ──────────────────────────────────────
+  document.body.addEventListener('htmx:beforeRequest', function(e) {
+    if (e.detail.elt && e.detail.elt.closest('form[hx-target="#result-panel"]')) {
+      const btn = document.querySelector('.btn-calculate');
+      if (btn) btn.innerHTML = '⏳ Computing…';
+    }
+  });
+  document.body.addEventListener('htmx:afterRequest', function(e) {
+    if (e.detail.elt && e.detail.elt.closest('form[hx-target="#result-panel"]')) {
+      const btn = document.querySelector('.btn-calculate');
+      if (btn) btn.innerHTML = '<span class="btn-triangle">▲</span> Calculate Triangular Number';
+    }
+  });
+</script>
+{% endblock %}
