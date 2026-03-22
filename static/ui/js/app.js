@@ -530,14 +530,21 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   for (let i = 0; i < leftFullStr.length; i += hplLen)
     leftFull.push(leftFullStr.slice(i, i + hplLen));
 
-  // Right: Python build_right starts with hpr[-rem:] (tail of hpr) then full tiles.
-  // So rightRemStr = tail of hpr (last rightRemLen chars of hpr).
+  // Right: use natural tile boundaries (modular rem).
+  // For pure repdigit: rem = tail-of-hpr prefix length; full tiles = hpr exactly.
+  // For increment: rem = same formula; full tiles = a fixed rotation of hpr (all equal).
+  // Natural boundaries ensure Pyramid content matches Standard mode char-for-char.
   const rightRemLen  = rightPart.length % hprLen;
   const rightRemStr  = rightRemLen > 0 ? rightPart.slice(0, rightRemLen) : '';
   const rightFullStr = rightRemLen > 0 ? rightPart.slice(rightRemLen) : rightPart;
   const rightFull    = [];
-  for (let i = 0; i < rightFullStr.length; i += hprLen)
+  for (let i = 0; i + hprLen <= rightFullStr.length; i += hprLen)
     rightFull.push(rightFullStr.slice(i, i + hprLen));
+  // Always override last tile with the true last hprLen chars of the result.
+  // Inner tiles repeat the same rotation; the last tile carries the actual final digit
+  // which may differ after any increment.
+  if (rightFull.length > 0)
+    rightFull[rightFull.length - 1] = rightPart.slice(-hprLen);
 
   const N      = leftFull.length;
   const M      = rightFull.length;
@@ -583,6 +590,14 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   //        last digit).  Rows k<cap end at rightFull[M-cap+k-1], showing the repeating inner
   //        pattern rather than always anchoring to the last tile.
   // leftPad keeps VPC column fixed at gapCol = cap*hplLen + leftRemLen for every row.
+  //
+  // rightBaseline: the expected repeating tile.
+  //   - Pure repdigit: rightFull[M-cap] = hpr exactly.
+  //   - After increment: rightFull[M-cap] = a fixed rotation of hpr (all inner tiles equal it).
+  // Comparing each tile to rightBaseline highlights tiles that DIFFER (the changed last tile)
+  // while unchanged inner tiles match fully → entire tile amber. Changed tile → partial/no amber.
+  const rightBaseline = rightFull[M - cap];
+
   for (let k = 1; k <= cap; k++) {
     let leftContent = '';
     if (highlightHpl) {
@@ -595,7 +610,7 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
     let rightContent = '';
     if (highlightHpr) {
       for (let i = M - cap; i < M - cap + k; i++)
-        rightContent += colorizeStr(rightFull[i], hpr, 'hpr-match');
+        rightContent += colorizeStr(rightFull[i], rightBaseline, 'hpr-match');
     } else {
       for (let i = M - cap; i < M - cap + k; i++) rightContent += rightFull[i];
     }
