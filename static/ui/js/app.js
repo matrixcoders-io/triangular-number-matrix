@@ -101,6 +101,51 @@ function detectRepdigit(str) {
 }
 
 /* ============================================================
+   DETECT CONSTANTS from a computed result string
+   Scans the result for a known hpl (identifies digit family), then
+   finds the active vpc key via tile-alignment check (same logic as
+   findBestVpcIdx). Falls back to first-occurrence if tile check misses
+   (e.g. after increment where surrounding tiles changed).
+   Returns { digit, vpcKey } or null.
+   ============================================================ */
+function detectConstantsFromResult(text) {
+  for (const [digit, data] of Object.entries(MATRIX)) {
+    if (!text.includes(data.hpl)) continue;
+    const hplLen = data.hpl.length;
+
+    // Strict tile-alignment check: find the vpc whose occurrence sits
+    // immediately after a complete hpl tile (verifies it's the real center).
+    for (const key of vpcKeys) {
+      const vpc = data[key];
+      if (!vpc || vpc === '—') continue;
+      let searchFrom = 0;
+      let found = false;
+      while (searchFrom < text.length) {
+        const idx = text.indexOf(vpc, searchFrom);
+        if (idx === -1) break;
+        for (let lr = 0; lr < hplLen; lr++) {
+          if (idx >= hplLen + lr && text.slice(idx - hplLen - lr, idx - lr) === data.hpl) {
+            found = true; break;
+          }
+        }
+        if (found) break;
+        searchFrom = idx + 1;
+      }
+      if (found) return { digit, vpcKey: key };
+    }
+
+    // Fallback: tile-alignment missed (increment shifted surrounding tiles).
+    // Pick the first vpc that appears anywhere in the text.
+    for (const key of vpcKeys) {
+      const vpc = data[key];
+      if (vpc && vpc !== '—' && text.includes(vpc)) return { digit, vpcKey: key };
+    }
+    return { digit, vpcKey: null };
+  }
+  return null;
+}
+
+/* ============================================================
    CONSTANTS PANEL
    ============================================================ */
 const vpcKeys = ['vpc1','vpc2','vpc3','vpc4','vpc5','vpc6','vpc7','vpc8','vpc9'];
@@ -783,6 +828,11 @@ function onResultSwap() {
   _windowOffset = 0;
   _navOffset    = 0;
   _currentPage  = 1;
+
+  // Update Matrix Constants panel to reflect the active constant in this result.
+  // Detects digit family (via hpl) and active vpc (via tile-alignment check).
+  const detected = detectConstantsFromResult(_resultFull);
+  if (detected) updateConstantsPanel(detected.digit, detected.vpcKey);
 
   // True total result length (may be larger than the 10 000-char preview).
   const totalEl = document.getElementById('result-total-chars');
