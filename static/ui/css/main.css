@@ -978,13 +978,25 @@ body {
   box-shadow: inset 0 0 30px rgba(52, 211, 153, 0.03);
 }
 
-/* Pyramid display mode — override normal word-wrap, allow horizontal/vertical scroll */
+/* Pyramid display mode — container allows horizontal/vertical scroll */
 .number-display.pyramid-mode {
-  white-space: pre;
-  word-break: normal;
-  overflow-wrap: normal;
   overflow-x: auto;
   overflow-y: auto;
+  /* white-space is intentionally NOT overridden here — whitespace preservation
+     is handled by the inner .pyramid-inner <pre> element via browser UA stylesheet */
+}
+
+/* Inner <pre> for pyramid layout.
+   width: max-content makes the element as wide as its longest line, which
+   causes the parent .number-display to scroll horizontally rather than wrap. */
+.pyramid-inner {
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  background: none;
+  border: none;
+  width: max-content;
+  min-width: 100%;
 }
 
 /* VPC constant highlight inside result display */

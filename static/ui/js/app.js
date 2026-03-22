@@ -242,7 +242,17 @@ function initFileBrowser() {
       if (fileDigit && MATRIX[fileDigit]) {
         _calcDigit     = null;
         _calcActiveKey = null;
-        updateConstantsPanel(fileDigit, null);
+        // For standard "N-Mk.txt" filenames (e.g. "2-1k.txt"), compute the VPC
+        // synchronously from digit + length so the constants panel is fully correct
+        // even before the async preview fetch fires onNumberInput.
+        const sizeMatch = filename.match(/-(\d+)k\b/i);
+        if (sizeMatch) {
+          const length = parseInt(sizeMatch[1], 10) * 1000;
+          const dr     = repdigitDigitalRoot(parseInt(fileDigit, 10), length);
+          updateConstantsPanel(fileDigit, `vpc${dr}`);
+        } else {
+          updateConstantsPanel(fileDigit, null);
+        }
       }
 
       const mode = getFileMode();
@@ -257,21 +267,19 @@ function initFileBrowser() {
           const resp = await fetch(`/files/preview?name=${encodeURIComponent(filename)}`);
           if (resp.ok) {
             const text = await resp.text();
+            const truncated = resp.headers.get('X-Preview-Truncated') === 'true';
+            const totalDigits = parseInt(resp.headers.get('X-File-Digits') || '0', 10);
             if (ta) {
-              const trimmed = text.trim();
-              ta.value = trimmed.length > INPUT_DISPLAY_CAP
-                ? trimmed.slice(0, INPUT_DISPLAY_CAP)
-                : trimmed;
+              ta.value = text;  // backend already caps at PREVIEW_CAP
               ta.dispatchEvent(new Event('input'));
-              // If content was truncated, override the meta label with real digit count
-              if (trimmed.length > INPUT_DISPLAY_CAP) {
+              if (truncated) {
                 const metaEl = document.getElementById('input-char-count');
                 if (metaEl) metaEl.textContent =
-                  `${trimmed.length.toLocaleString()} digits · showing ${INPUT_DISPLAY_CAP.toLocaleString()} digits`;
+                  `${totalDigits.toLocaleString()} digits · showing first ${INPUT_DISPLAY_CAP.toLocaleString()}`;
               }
             }
           } else {
-            // HTTP transfer may be disabled or file too large — show a note instead
+            // HTTP transfer disabled (403) or other server error
             if (ta) {
               ta.value = '';
               ta.placeholder = `[Disk-Direct] ${filename} — content will be read from server on Calculate`;
@@ -296,7 +304,17 @@ function initFileBrowser() {
           return;
         }
         const text = await resp.text();
-        if (ta) { ta.value = text.trim(); ta.dispatchEvent(new Event('input')); }
+        const truncated = resp.headers.get('X-Preview-Truncated') === 'true';
+        const totalDigits = parseInt(resp.headers.get('X-File-Digits') || '0', 10);
+        if (ta) {
+          ta.value = text;
+          ta.dispatchEvent(new Event('input'));
+          if (truncated) {
+            const metaEl = document.getElementById('input-char-count');
+            if (metaEl) metaEl.textContent =
+              `${totalDigits.toLocaleString()} digits · showing first ${INPUT_DISPLAY_CAP.toLocaleString()}`;
+          }
+        }
       } catch (err) {
         if (ta) ta.value = '';
         console.error('File preview failed:', err);
@@ -497,18 +515,38 @@ function renderPyramid() {
 
   if (_resultTotalChars > RESULT_WINDOW) {
     display.classList.remove('pyramid-mode');
+    display.style.overflowX = '';
+    display.style.overflowY = '';
     display.textContent =
       'Pyramid view is only available for results ≤ 10,000 digits.\n' +
       'This result has ' + _resultTotalChars.toLocaleString() + ' digits — use Standard view.';
     return;
   }
 
-  const vpcVal = document.getElementById('active-const-value')?.textContent.trim() ?? '';
-  const hpl    = document.getElementById('const-hpl')?.textContent.trim() ?? '';
-  const hpr    = document.getElementById('const-hpr')?.textContent.trim() ?? '';
+  let vpcVal = document.getElementById('active-const-value')?.textContent.trim() ?? '';
+  const hpl  = document.getElementById('const-hpl')?.textContent.trim() ?? '';
+  const hpr  = document.getElementById('const-hpr')?.textContent.trim() ?? '';
+
+  // If the stored VPC is stale (wrong digit's constant) or missing, auto-detect from MATRIX.
+  // hpl uniquely identifies the digit family; scan that family's VPCs for one present in the result.
+  if (!vpcVal || vpcVal === '—' || !_resultFull.includes(vpcVal)) {
+    for (const data of Object.values(MATRIX)) {
+      if (data.hpl !== hpl) continue;
+      for (const key of vpcKeys) {
+        const candidate = data[key];
+        if (candidate && candidate !== '—' && _resultFull.includes(candidate)) {
+          vpcVal = candidate;
+          break;
+        }
+      }
+      break;
+    }
+  }
 
   if (!vpcVal || vpcVal === '—') {
     display.classList.remove('pyramid-mode');
+    display.style.overflowX = '';
+    display.style.overflowY = '';
     display.textContent = 'No active constant — calculate a result first, then select Pyramid view.';
     return;
   }
@@ -516,13 +554,23 @@ function renderPyramid() {
   const result = buildPyramid(_resultFull, vpcVal, hpl, hpr);
   if (!result) {
     display.classList.remove('pyramid-mode');
+    display.style.overflowX = '';
+    display.style.overflowY = '';
     display.textContent = _resultFull; // fall back to raw digits
     return;
   }
 
   const { html: pyramid, gapCol } = result;
   display.classList.add('pyramid-mode');
-  display.innerHTML = pyramid;
+  // Set overflow on the container div; whitespace preservation is handled by the
+  // inner <pre class="pyramid-inner"> which uses the browser UA stylesheet's
+  // white-space:pre — no CSS cascade fight needed.
+  display.style.whiteSpace = '';
+  display.style.wordBreak = '';
+  display.style.overflowWrap = '';
+  display.style.overflowX = 'auto';
+  display.style.overflowY = 'auto';
+  display.innerHTML = '<pre class="pyramid-inner">' + pyramid + '</pre>';
   display.scrollTop = 0;
 
   // Auto-scroll horizontally to center the VPC column in the viewport
@@ -546,7 +594,11 @@ function renderCurrentMode() {
     renderPyramid();
   } else {
     const display = document.getElementById('number-display');
-    if (display) display.classList.remove('pyramid-mode');
+    if (display) {
+      display.classList.remove('pyramid-mode');
+      display.style.overflowX = '';
+      display.style.overflowY = '';
+    }
     renderWindowContent(_resultFull);
   }
 }
@@ -584,6 +636,12 @@ async function loadWindow(offset) {
     if (navIndex) navIndex.value = _currentPage;
     const navTotal = document.getElementById('nav-total');
     if (navTotal) navTotal.textContent = `/ ${_totalPages.toLocaleString()} pages`;
+    const navChars = document.getElementById('nav-chars');
+    if (navChars) {
+      const start = (_windowOffset + 1).toLocaleString();
+      const end   = Math.min(_windowOffset + _resultLength, _resultTotalChars).toLocaleString();
+      navChars.textContent = `chars ${start}–${end} of ${_resultTotalChars.toLocaleString()}`;
+    }
 
     renderCurrentMode();
   } catch (e) {
@@ -615,6 +673,11 @@ function onResultSwap() {
   if (navIndex) navIndex.value = 1;
   const navTotal = document.getElementById('nav-total');
   if (navTotal) navTotal.textContent = `/ ${_totalPages.toLocaleString()} pages`;
+  const navChars = document.getElementById('nav-chars');
+  if (navChars) {
+    const end = Math.min(_resultLength, _resultTotalChars).toLocaleString();
+    navChars.textContent = `chars 1–${end} of ${_resultTotalChars.toLocaleString()}`;
+  }
 
   // Render in the current display mode (standard or pyramid).
   renderCurrentMode();

@@ -1,6 +1,6 @@
 # PROJECT.MD — Triangular Number Matrix Calculator
 
-> Last updated: 2026-03-21 (session 2) | Current phase: Phase 2 in progress — pyramid display algorithm unresolved
+> Last updated: 2026-03-21 (session 3) | Current phase: Phase 2 in progress — pyramid working (cap=10 cumulative), 2 new bugs open
 
 ---
 
@@ -94,6 +94,7 @@ triangular-number-matrix/
 |-----------|-------|--------|--------------|---------|
 | `calculator_bp` | `/` | GET | WEB | Full `index.html` |
 | `calculator_bp` | `/calc` | POST | HTMX | `partials/result_panel.html` partial |
+| `calculator_bp` | `/calc/window` | GET | JSON | `{chunk, total, offset, length}` — 10K char window for result nav |
 | `calculator_bp` | `/rep-digit-math` | GET/POST | API | Elapsed time plain text |
 | `files_bp` | `/files/list` | GET | JSON | Array of file metadata dicts |
 | `files_bp` | `/files/preview` | GET | Text | Raw file content (stripped) |
@@ -275,7 +276,7 @@ Flask reads `file_mode` to decide whether to read from disk or use the `num1` te
 |-------|--------|---------|
 | Phase 0 — Bug Fixes | ✅ Complete | Fixed duplicate Flask init, TypeError, logging, file_load_time string type |
 | Phase 1 — Structural Refactor | ✅ Complete | Blueprints, core/, ui/templates/, static/ui/, config.py |
-| Phase 2 — UI Enhancements | 🔄 In Progress | HTMX partial swaps, VPC constants panel, file browser, run history, lab panel, file input mode toggle, result nav, 10K display cap — **Pyramid display BROKEN** (delta design shows hollow triangle; need cumulative cap=10 design) |
+| Phase 2 — UI Enhancements | 🔄 In Progress | HTMX partial swaps, VPC constants panel, file browser, run history, lab panel, file input mode toggle, result nav, 10K display cap — Pyramid cap=10 cumulative working (VPC highlighted, auto-scroll). 2 open bugs: large-file textarea display (413), Prev/Next nav scrolls 1 digit (needs investigation). |
 | Phase 3 — Testing Expansion | 🔲 Next | Expand test coverage, all 4 modes × all 9 digits, edge cases |
 | Phase 4 — Non-repdigit / Increment | 🔲 Planned | Polish `increment_by_gmpy_count`, UI support for offset input |
 

@@ -15,15 +15,30 @@ logger = logging.getLogger(__name__)
 
 files_bp = Blueprint("files", __name__)
 
+PREVIEW_CAP = 10_000  # max digits returned to browser for textarea preview
+
+
+def _count_digits(path: str) -> int:
+    """Count digits in a number file without loading it into memory.
+
+    Works by using file size (1 byte per ASCII digit) and checking whether
+    the last byte is a newline so we can subtract it if needed.
+    """
+    size = os.path.getsize(path)
+    if size == 0:
+        return 0
+    with open(path, "rb") as f:
+        f.seek(-1, 2)
+        last = f.read(1)
+    return size - 1 if last in (b"\n", b"\r") else size
+
 
 def _file_info(filename: str) -> dict:
     """Return size and digit count for a number file."""
     path = os.path.join(NUMBERS_DIR, filename)
     try:
         size_bytes = os.path.getsize(path)
-        with open(path, "r", encoding="utf-8") as f:
-            content = f.read().strip()
-        digits = len(content)
+        digits = _count_digits(path)
         return {
             "name": filename,
             "size_bytes": size_bytes,
@@ -71,9 +86,10 @@ def list_files():
 @files_bp.route("/files/preview")
 def preview_file():
     """
-    HTTP transfer mode: return file content to browser.
+    Return the first PREVIEW_CAP digits of a number file for textarea display.
+    Adds X-File-Digits and X-Preview-Truncated headers so the browser can show
+    a truncation note without loading the full file into memory.
     Returns 403 if HTTP transfer is disabled in config.
-    Returns 413 if the file exceeds UI_HTTP_FILE_MAX_DIGITS.
     """
     if not UI_HTTP_FILE_TRANSFER:
         return "HTTP file transfer is disabled.", 403
@@ -85,15 +101,19 @@ def preview_file():
     if not os.path.isfile(path):
         abort(404)
     try:
+        total_digits = _count_digits(path)
         with open(path, "r", encoding="utf-8") as f:
-            content = f.read().strip()
-        if len(content) > UI_HTTP_FILE_MAX_DIGITS:
-            return (
-                f"File too large for HTTP transfer ({len(content):,} digits). "
-                f"Switch to Disk-Direct mode (limit: {UI_HTTP_FILE_MAX_DIGITS:,} digits).",
-                413,
-            )
-        return content, 200, {"Content-Type": "text/plain; charset=utf-8"}
+            chunk = f.read(PREVIEW_CAP + 1)
+        # Strip trailing newline from the read chunk before checking truncation
+        content = chunk.rstrip("\n\r ")
+        truncated = len(content) > PREVIEW_CAP
+        content = content[:PREVIEW_CAP]
+        headers = {
+            "Content-Type": "text/plain; charset=utf-8",
+            "X-File-Digits": str(total_digits),
+            "X-Preview-Truncated": "true" if truncated else "false",
+        }
+        return content, 200, headers
     except Exception as e:
         logger.error("files/preview failed for %s: %s", name, e)
         abort(500)
