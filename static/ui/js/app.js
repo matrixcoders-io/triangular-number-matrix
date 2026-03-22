@@ -366,6 +366,9 @@ let _currentPage      = 1;   // 1-based page number of current window
 let _totalPages       = 0;   // total pages = ceil(_resultTotalChars / RESULT_WINDOW)
 let _displayMode      = 'pyramid';  // 'standard' | 'pyramid'
 
+let _highlightHpl = false;  // HPL pattern highlight toggle
+let _highlightHpr = false;  // HPR pattern highlight toggle
+
 /** Convert 1-based page number to byte/char offset. */
 function pageToOffset(page) { return Math.max(0, page - 1) * RESULT_WINDOW; }
 
@@ -449,27 +452,86 @@ function renderWindowContent(text) {
  */
 const MAX_PYRAMID_ROWS = 10;
 
-function buildPyramid(text, vpcVal, hpl, hpr) {
+/**
+ * Char-by-char comparison: wraps matching chars in a colored span, leaves non-matching as plain text.
+ * @param {string} str      The actual string to colorize (e.g. a hpl/hpr chunk or remainder).
+ * @param {string} expected The reference pattern to compare against (aligned to str[0]).
+ * @param {string} cssClass CSS class to apply to matching chars ('hpl-match' or 'hpr-match').
+ * @returns {string} HTML string — matching chars in spans, non-matching as plain text.
+ */
+function colorizeStr(str, expected, cssClass) {
+  let html = '';
+  for (let i = 0; i < str.length; i++) {
+    if (i < expected.length && str[i] === expected[i]) {
+      html += `<span class="${cssClass}">${str[i]}</span>`;
+    } else {
+      html += str[i];
+    }
+  }
+  return html;
+}
+
+/**
+ * Find the VPC index using tile-alignment verification.
+ * Rejects coincidental VPC occurrences (e.g. in a +1 incremented TN) by checking
+ * that the tile immediately to the left of the candidate position matches hpl.
+ * Tries all possible leftRemLens (0..hplLen-1) to handle partial leading tiles.
+ * Returns -1 if no well-aligned occurrence is found.
+ */
+function findBestVpcIdx(text, vpcVal, hpl) {
+  const hplLen = hpl.length;
+  let searchFrom = 0;
+  while (searchFrom < text.length) {
+    const idx = text.indexOf(vpcVal, searchFrom);
+    if (idx === -1) break;
+    // Check for each possible leftRemLen: is the full hpl tile just before leftRem == hpl?
+    for (let lr = 0; lr < hplLen; lr++) {
+      if (idx >= hplLen + lr && text.slice(idx - hplLen - lr, idx - lr) === hpl) return idx;
+    }
+    searchFrom = idx + 1;
+  }
+  // Tile-alignment failed for all occurrences (e.g. increment changed surrounding tiles).
+  // Fall back to the first occurrence — still correct when vpcVal is unique in the text.
+  const fallback = text.indexOf(vpcVal);
+  console.log('[findBestVpcIdx] tile-alignment miss for', JSON.stringify(vpcVal),
+    '— fallback pos', fallback, '(text len', text.length + ')');
+  return fallback;
+}
+
+function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   if (!vpcVal || vpcVal === '—') return null;
   if (!hpl || hpl === '—' || !hpr || hpr === '—') return null;
 
-  const vpcIdx = text.indexOf(vpcVal);
+  const hplLen = hpl.length;
+  const hprLen = hpr.length;
+
+  // Look up lc prefix length for this digit family (digits 5, 7, 9 have a 1-char lc prefix).
+  // leftFull tiles start after the lc prefix.
+  let lcLen = 0;
+  for (const data of Object.values(MATRIX)) {
+    if (data.hpl === hpl) { lcLen = data.lc ? data.lc.length : 0; break; }
+  }
+
+  // Find vpcIdx with tile-alignment verification (rejects coincidental matches in changed zones).
+  const vpcIdx = findBestVpcIdx(text, vpcVal, hpl);
   if (vpcIdx === -1) return null;
 
   const leftPart  = text.slice(0, vpcIdx);
   const rightPart = text.slice(vpcIdx + vpcVal.length);
-  const hplLen    = hpl.length;
-  const hprLen    = hpr.length;
 
-  // Left: full hpl patterns + partial remainder at end (partial is closest to VPC)
-  const leftRemLen  = leftPart.length % hplLen;
-  const leftRemStr  = leftRemLen > 0 ? leftPart.slice(-leftRemLen) : '';
-  const leftFullStr = leftRemLen > 0 ? leftPart.slice(0, -leftRemLen) : leftPart;
-  const leftFull    = [];
+  // Left: skip lc prefix, then split into full hpl tiles + leftRem (partial, closest to VPC).
+  // Python build_left tiles L→R: full tiles then hpl[0:rem] at the end.
+  // So leftRemStr = head of hpl (first leftRemLen chars).
+  const leftTilesPart = leftPart.slice(lcLen);
+  const leftRemLen    = leftTilesPart.length % hplLen;
+  const leftRemStr    = leftRemLen > 0 ? leftTilesPart.slice(-leftRemLen) : '';
+  const leftFullStr   = leftRemLen > 0 ? leftTilesPart.slice(0, -leftRemLen) : leftTilesPart;
+  const leftFull      = [];
   for (let i = 0; i < leftFullStr.length; i += hplLen)
     leftFull.push(leftFullStr.slice(i, i + hplLen));
 
-  // Right: partial remainder at start (closest to VPC) + full hpr patterns
+  // Right: Python build_right starts with hpr[-rem:] (tail of hpr) then full tiles.
+  // So rightRemStr = tail of hpr (last rightRemLen chars of hpr).
   const rightRemLen  = rightPart.length % hprLen;
   const rightRemStr  = rightRemLen > 0 ? rightPart.slice(0, rightRemLen) : '';
   const rightFullStr = rightRemLen > 0 ? rightPart.slice(rightRemLen) : rightPart;
@@ -481,28 +543,67 @@ function buildPyramid(text, vpcVal, hpl, hpr) {
   const M      = rightFull.length;
   const vpcLen = vpcVal.length;
 
-  // Cumulative design: cap rows, each row shows ALL patterns from VPC outward to that layer.
-  // gapCol is the indent of the apex, sized so row `cap` starts at column 0.
+  console.log('[buildPyramid] vpcIdx=' + vpcIdx + ' vpcVal=' + JSON.stringify(vpcVal) +
+    ' leftRemLen=' + leftRemLen + ' rightRemLen=' + rightRemLen + ' N=' + N + ' M=' + M +
+    ' | resultTail=' + JSON.stringify(text.slice(-9)) +
+    ' rightPartTail=' + JSON.stringify(rightPart.slice(-9)) +
+    ' rightFull[M-1]=' + JSON.stringify(rightFull[M - 1]));
+
+  // cap = max rows to show. gapCol = column where VPC starts in every row.
+  // Row k text widths: left = k*hplLen + leftRemLen, right = rightRemLen + k*hprLen.
+  // leftPad = gapCol - (k*hplLen + leftRemLen) = (cap-k)*hplLen  (purely arithmetic).
   const cap    = Math.min(N, M, MAX_PYRAMID_ROWS);
   if (cap === 0) return null;
-  const gapCol = cap * hplLen + leftRemLen;
+  const gapCol = cap * hplLen + leftRemLen;  // column where VPC starts
 
-  const lines  = [];
+  // Colorize helpers for the partial rem slots:
+  //   leftRem aligns to hpl HEAD  (hpl[0:leftRemLen])
+  //   rightRem aligns to hpr TAIL (hpr[hprLen-rightRemLen:])
+  const colorLeftRem  = () => colorizeStr(leftRemStr,  hpl.slice(0, leftRemLen),          'hpl-match');
+  const colorRightRem = () => colorizeStr(rightRemStr, hpr.slice(hprLen - rightRemLen),   'hpr-match');
 
-  // Apex: VPC alone, highlighted
-  lines.push(' '.repeat(gapCol) + '<span class="vpc-highlight">' + vpcVal + '</span>');
+  const lines = [];
 
-  // Body rows: row k shows k innermost left patterns + leftRem | rightRem + k innermost right patterns
+  // Apex row: leftRem + VPC (red) + rightRem — the partial patterns adjacent to the constant.
+  {
+    const apexLeft  = (leftRemLen  > 0 && highlightHpl) ? colorLeftRem()  : leftRemStr;
+    const apexRight = (rightRemLen > 0 && highlightHpr) ? colorRightRem() : rightRemStr;
+    lines.push(
+      ' '.repeat(cap * hplLen) +
+      apexLeft +
+      '<span class="vpc-highlight">' + vpcVal + '</span>' +
+      apexRight
+    );
+  }
+
+  // Body rows k=1..cap: k tiles on each side, growing wider per row.
+  // Left:  outermost k left tiles  → leftFull[0..k-1]    (start of number, farthest from VPC)
+  // Right: window [M-cap..M-cap+k-1] — a fixed cap-wide slice at the far end, revealed one tile
+  //        per row.  Row k=cap shows the full window including rightFull[M-1] (last tile, correct
+  //        last digit).  Rows k<cap end at rightFull[M-cap+k-1], showing the repeating inner
+  //        pattern rather than always anchoring to the last tile.
+  // leftPad keeps VPC column fixed at gapCol = cap*hplLen + leftRemLen for every row.
   for (let k = 1; k <= cap; k++) {
-    let leftStr = '';
-    for (let i = N - k; i < N; i++) leftStr += leftFull[i];
-    leftStr += leftRemStr;
+    let leftContent = '';
+    if (highlightHpl) {
+      for (let i = 0; i < k; i++)
+        leftContent += colorizeStr(leftFull[i], hpl, 'hpl-match');
+    } else {
+      for (let i = 0; i < k; i++) leftContent += leftFull[i];
+    }
 
-    let rightStr = rightRemStr;
-    for (let i = 0; i < k; i++) rightStr += rightFull[i];
+    let rightContent = '';
+    if (highlightHpr) {
+      for (let i = M - cap; i < M - cap + k; i++)
+        rightContent += colorizeStr(rightFull[i], hpr, 'hpr-match');
+    } else {
+      for (let i = M - cap; i < M - cap + k; i++) rightContent += rightFull[i];
+    }
 
-    const leftPad = ' '.repeat(gapCol - leftStr.length);
-    lines.push(leftPad + leftStr + ' '.repeat(vpcLen) + rightStr);
+    // leftPad: text length of leftContent = k*hplLen (no partial).
+    // gapCol = cap*hplLen + leftRemLen → leftPad = (cap-k)*hplLen + leftRemLen.
+    const leftPad = ' '.repeat((cap - k) * hplLen + leftRemLen);
+    lines.push(leftPad + leftContent + ' '.repeat(vpcLen) + rightContent);
   }
 
   return { html: lines.join('\n'), gapCol };
@@ -551,7 +652,11 @@ function renderPyramid() {
     return;
   }
 
-  const result = buildPyramid(_resultFull, vpcVal, hpl, hpr);
+  console.log('[renderPyramid] vpcVal=' + JSON.stringify(vpcVal) +
+    ' hpl=' + JSON.stringify(hpl) + ' hpr=' + JSON.stringify(hpr) +
+    ' highlightHpl=' + _highlightHpl + ' highlightHpr=' + _highlightHpr +
+    ' textLen=' + _resultFull.length);
+  const result = buildPyramid(_resultFull, vpcVal, hpl, hpr, _highlightHpl, _highlightHpr);
   if (!result) {
     display.classList.remove('pyramid-mode');
     display.style.overflowX = '';
@@ -752,6 +857,26 @@ function initCopyButton() {
 }
 
 /* ============================================================
+   PATTERN HIGHLIGHT TOGGLES — HPL / HPR
+   ============================================================ */
+function initPatternToggles() {
+  document.getElementById('toggle-hpl')?.addEventListener('click', () => {
+    _highlightHpl = !_highlightHpl;
+    const btn = document.getElementById('toggle-hpl');
+    btn.classList.toggle('active', _highlightHpl);
+    btn.textContent = _highlightHpl ? 'ON' : 'OFF';
+    if (_displayMode === 'pyramid') renderCurrentMode();
+  });
+  document.getElementById('toggle-hpr')?.addEventListener('click', () => {
+    _highlightHpr = !_highlightHpr;
+    const btn = document.getElementById('toggle-hpr');
+    btn.classList.toggle('active', _highlightHpr);
+    btn.textContent = _highlightHpr ? 'ON' : 'OFF';
+    if (_displayMode === 'pyramid') renderCurrentMode();
+  });
+}
+
+/* ============================================================
    KEYBOARD SHORTCUTS
    ============================================================ */
 document.addEventListener('keydown', (e) => {
@@ -776,6 +901,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initCollapsibles();
   initResultNav();
   initCopyButton();
+  initPatternToggles();
   colorizeMethodBadges();
 
   // Wire up number textarea

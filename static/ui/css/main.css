@@ -709,6 +709,13 @@ body {
   word-break: break-all;
 }
 
+/* Flex row: pattern value + toggle button side by side */
+.pattern-value-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 /* Left pattern — violet; Right pattern — warm copper/brown */
 #const-hpl { color: var(--violet); }
 #const-hpr { color: #c07842; }
@@ -1003,6 +1010,41 @@ body {
 .vpc-highlight {
   color: var(--red);
   font-weight: 700;
+}
+
+/* Pattern highlight colors — char-by-char match in pyramid view */
+.hpl-match { color: var(--violet); }
+.hpr-match { color: #c07842; }  /* matches #const-hpr warm copper/brown */
+
+/* HPL / HPR toggle chip buttons in the constants panel */
+.pattern-toggle {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.68rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+  margin-left: 0.4rem;
+  vertical-align: middle;
+}
+.pattern-toggle:hover {
+  border-color: var(--border-bright);
+  color: var(--text-primary);
+}
+.pattern-toggle.active.hpl {
+  background: var(--violet);
+  border-color: var(--violet);
+  color: #000;
+}
+.pattern-toggle.active.hpr {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: #000;
 }
 
 /* Custom scrollbar */
