@@ -1,53 +1,5 @@
 [
   {
-    "ts": "2026-03-22T15:10:03",
-    "method": "tri_matrix",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.004119
-  },
-  {
-    "ts": "2026-03-22T15:10:04",
-    "method": "tri_matrix",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.001431
-  },
-  {
-    "ts": "2026-03-22T15:10:04",
-    "method": "tri_matrix",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.001469
-  },
-  {
-    "ts": "2026-03-22T15:10:05",
-    "method": "tri_matrix",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.003561
-  },
-  {
-    "ts": "2026-03-22T15:10:06",
-    "method": "tri_matrix",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.001391
-  },
-  {
-    "ts": "2026-03-22T15:10:07",
-    "method": "tri_matrix",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.001422
-  },
-  {
     "ts": "2026-03-22T15:10:08",
     "method": "tri_matrix",
     "repdigit": "1",
@@ -798,5 +750,53 @@
     "length": 1000,
     "result_chars": 1998,
     "elapsed": 0.001673
+  },
+  {
+    "ts": "2026-03-22T17:43:21",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.005182
+  },
+  {
+    "ts": "2026-03-22T17:43:28",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.001497
+  },
+  {
+    "ts": "2026-03-22T17:44:05",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.002326
+  },
+  {
+    "ts": "2026-03-22T17:48:06",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.00261
+  },
+  {
+    "ts": "2026-03-22T17:48:19",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 999,
+    "result_chars": 1996,
+    "elapsed": 0.002169
+  },
+  {
+    "ts": "2026-03-22T17:48:29",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 998,
+    "result_chars": 1994,
+    "elapsed": 0.014353
   }
 ]
