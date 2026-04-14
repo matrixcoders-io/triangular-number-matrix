@@ -1,0 +1,42 @@
+{{- if .Values.ingress.enabled }}
+# GKE Ingress — creates a Google Cloud L7 HTTPS Load Balancer.
+# This is the external entry point for all traffic to matrixcoders.io.
+# The LB appears in GCP Console → Network Services → Load Balancing where you
+# can attach Cloud Armor policies, view backend health, and inspect URL maps.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "tnm.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "tnm.labels" . | nindent 4 }}
+  annotations:
+    # Use GKE's built-in GCE ingress controller (creates GCP L7 LB)
+    kubernetes.io/ingress.class: "gce"
+    # Attach the managed TLS certificate
+    {{- if .Values.managedCertificate.enabled }}
+    networking.gke.io/managed-certificates: {{ .Values.managedCertificate.name }}
+    {{- end }}
+    # Attach HTTP→HTTPS redirect config
+    networking.gke.io/v1beta1.FrontendConfig: {{ include "tnm.fullname" . }}-frontend
+    # Disable plain HTTP on the LB once cert is ACTIVE (recommended for production)
+    # Set to "true" to allow HTTP during initial cert provisioning if needed.
+    kubernetes.io/ingress.allow-http: "false"
+    {{- if .Values.ingress.staticIpName }}
+    # Static global IP — reserve first:
+    #   gcloud compute addresses create {{ .Values.ingress.staticIpName }} --global --project=matrix-coders
+    kubernetes.io/ingress.global-static-ip-name: {{ .Values.ingress.staticIpName | quote }}
+    {{- end }}
+spec:
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "tnm.fullname" . }}
+                port:
+                  number: {{ .Values.service.port }}
+{{- end }}

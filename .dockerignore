@@ -1,0 +1,41 @@
+# Virtual environment
+.venv/
+venv/
+
+# Only include *-1k.txt from numbers directory — all others are too large for the image
+static/numbers/*
+!static/numbers/*-1k.txt
+
+# Output directory is mounted as a volume at runtime — never bake into image
+static/output/
+
+# Development and documentation
+claude/
+images/
+tmp/
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.vscode/
+.idea/
+
+# Test output
+.coverage
+htmlcov/
+
+# Docker folder itself (Dockerfile/compose are build tools, not app code)
+docker/
