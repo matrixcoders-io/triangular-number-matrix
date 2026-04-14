@@ -1,0 +1,15 @@
+{{- if .Values.ingress.enabled }}
+# FrontendConfig: forces HTTP → HTTPS redirect at the GCP load balancer level.
+# Any request to http://matrixcoders.io/* is redirected to https:// with a 301.
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: {{ include "tnm.fullname" . }}-frontend
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "tnm.labels" . | nindent 4 }}
+spec:
+  redirectToHttps:
+    enabled: true
+    responseCodeName: MOVED_PERMANENTLY_DEFAULT
+{{- end }}

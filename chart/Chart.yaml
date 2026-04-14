@@ -1,0 +1,16 @@
+apiVersion: v2
+name: triangular-number-matrix
+description: >
+  Triangular Number Matrix calculator — Flask web application for computing,
+  visualizing, and benchmarking triangular numbers derived from repdigit inputs.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - mathematics
+  - triangular-numbers
+  - research
+  - flask
+maintainers:
+  - name: matrixcoders-io
+    url: https://github.com/matrixcoders-io/triangular-number-matrix
