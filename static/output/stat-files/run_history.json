@@ -5,14 +5,6 @@
     "repdigit": "1",
     "length": 1000,
     "result_chars": 1998,
-    "elapsed": 0.001362
-  },
-  {
-    "ts": "2026-04-16T01:31:55",
-    "method": "tri_matrix",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
     "elapsed": 0.000544
   },
   {
@@ -798,5 +790,13 @@
     "length": 1000,
     "result_chars": 1998,
     "elapsed": 13.164935
+  },
+  {
+    "ts": "2026-04-16T02:09:08",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 13.611444
   }
 ]

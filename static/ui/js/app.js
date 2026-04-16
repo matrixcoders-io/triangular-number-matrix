@@ -411,8 +411,8 @@ let _currentPage      = 1;   // 1-based page number of current window
 let _totalPages       = 0;   // total pages = ceil(_resultTotalChars / RESULT_WINDOW)
 let _displayMode      = 'pyramid';  // 'standard' | 'pyramid'
 
-let _highlightHpl = false;  // HPL pattern highlight toggle
-let _highlightHpr = false;  // HPR pattern highlight toggle
+let _highlightHpl = true;  // HPL pattern highlight toggle
+let _highlightHpr = true;  // HPR pattern highlight toggle
 
 /** Convert 1-based page number to byte/char offset. */
 function pageToOffset(page) { return Math.max(0, page - 1) * RESULT_WINDOW; }
