@@ -98,7 +98,7 @@
         <div class="loading-bar"></div>
       </form>
 
-      {# ── Result (inset, below calculator controls) ── #}
+      {# ── Stats + Nav inset (display-only, no number output here) ── #}
       <div class="result-inset">
         <div class="result-inset-header">
           <span><span style="opacity:0.9;">⊕</span> Result</span>
@@ -169,23 +169,24 @@
         <span class="badge badge-rpr" id="badge-rpr">—</span>
       </div>
 
-      <div class="active-indicator">
-        <div class="active-indicator-row">
-          <div class="active-indicator-col">
-            <div class="active-indicator-label">Active Constant</div>
-            <div class="active-indicator-value" id="active-const-value">—</div>
-          </div>
-          <div class="active-indicator-col">
-            <div class="active-indicator-label">Digital Root</div>
-            <div class="active-dr-value" id="active-dr-value">—</div>
-          </div>
-        </div>
-      </div>
+      {# Ghost elements — hidden, keep IDs alive for pyramid JS #}
+      <span id="active-const-value" style="display:none;"></span>
+      <span id="active-dr-value"    style="display:none;"></span>
 
     </div>
   </div>{# /constants panel #}
 
 </div>{# /top-grid #}
+
+
+{# ══════════════════════════════════════════════════════════════════
+   DISPLAY PANEL — full-width triangular number output
+   JS populates #number-display after every calculation.
+   Server pre-populates on GET /.
+   ══════════════════════════════════════════════════════════════════ #}
+<div class="display-panel">
+  <div class="number-display" id="number-display">{{ result or '' }}</div>
+</div>
 
 
 {# ══════════════════════════════════════════════════════════════════

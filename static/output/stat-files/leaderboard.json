@@ -14,5 +14,13 @@
     "length": 1000000,
     "result_chars": 1999998,
     "elapsed": 7.016189
+  },
+  "tri_div_gmpy2_formula": {
+    "ts": "2026-04-16T01:45:41",
+    "method": "tri_div_gmpy2_formula",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 12.992431
   }
 }
