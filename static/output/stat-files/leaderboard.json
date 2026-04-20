@@ -1,26 +1,34 @@
 {
   "tri_matrix": {
-    "ts": "2026-03-22T16:21:38",
+    "ts": "2026-04-19T19:04:59",
     "method": "tri_matrix",
     "repdigit": "1",
-    "length": 1000000,
-    "result_chars": 1999998,
-    "elapsed": 0.006227
+    "length": 4000000000,
+    "result_chars": 7999999998,
+    "elapsed": 107.416631
   },
   "tri_matrix_stream": {
-    "ts": "2026-03-22T16:22:03",
+    "ts": "2026-04-19T22:34:31",
     "method": "tri_matrix_stream",
     "repdigit": "1",
-    "length": 1000000,
-    "result_chars": 1999998,
-    "elapsed": 7.016189
+    "length": 4000000000,
+    "result_chars": 7999999998,
+    "elapsed": 15.953696
   },
   "tri_div_gmpy2_formula": {
-    "ts": "2026-04-16T01:45:41",
+    "ts": "2026-04-19T21:12:50",
     "method": "tri_div_gmpy2_formula",
     "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 12.992431
+    "length": 4000000000,
+    "result_chars": 7999999998,
+    "elapsed": 4078.46163
+  },
+  "tri_matrix_memory": {
+    "ts": "2026-04-19T23:07:42",
+    "method": "tri_matrix_memory",
+    "repdigit": "1",
+    "length": 4000000000,
+    "result_chars": 7999999998,
+    "elapsed": 78.927856
   }
 }
