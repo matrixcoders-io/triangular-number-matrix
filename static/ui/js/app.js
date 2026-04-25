@@ -108,7 +108,34 @@ function detectRepdigit(str) {
    (e.g. after increment where surrounding tiles changed).
    Returns { digit, vpcKey } or null.
    ============================================================ */
-function detectConstantsFromResult(text) {
+function detectConstantsFromResult(text, hintDigit = null) {
+  // Fast path: digit family already known — skip hpl scan, just find the vpc key.
+  // Prevents misidentification when increment shifts tiles near single-char hpl patterns.
+  if (hintDigit && MATRIX[hintDigit]) {
+    const data   = MATRIX[hintDigit];
+    const hplLen = data.hpl.length;
+    for (const key of vpcKeys) {
+      const vpc = data[key];
+      if (!vpc || vpc === '—') continue;
+      let searchFrom = 0;
+      while (searchFrom < text.length) {
+        const idx = text.indexOf(vpc, searchFrom);
+        if (idx === -1) break;
+        for (let lr = 0; lr < hplLen; lr++) {
+          if (idx >= hplLen + lr && text.slice(idx - hplLen - lr, idx - lr) === data.hpl) {
+            return { digit: hintDigit, vpcKey: key };
+          }
+        }
+        searchFrom = idx + 1;
+      }
+    }
+    for (const key of vpcKeys) {
+      const vpc = data[key];
+      if (vpc && vpc !== '—' && text.includes(vpc)) return { digit: hintDigit, vpcKey: key };
+    }
+    return { digit: hintDigit, vpcKey: null };
+  }
+
   for (const [digit, data] of Object.entries(MATRIX)) {
     if (!text.includes(data.hpl)) continue;
     const hplLen = data.hpl.length;
@@ -227,10 +254,13 @@ function onNumberInput(e) {
    ============================================================ */
 function initDigitSelector() {
   document.querySelectorAll('.digit-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const d = btn.dataset.digit;
       const key = (d === _calcDigit) ? _calcActiveKey : null;
       updateConstantsPanel(d, key);
+      // Load the minimum file for this digit family, then auto-calculate.
+      await loadFile(`${d}-1k.txt`);
+      document.querySelector('.btn-calculate')?.click();
     });
   });
   // Default: show digit 1 on load
@@ -261,110 +291,89 @@ function clearDiskHiddenField() {
 }
 
 /* ============================================================
+   FILE LOADER — shared by file browser Use buttons and digit selector
+   ============================================================ */
+
+/**
+ * Load a number file: mark it selected in the UI, update Number Family,
+ * set the disk hidden field (disk mode) or fetch content into textarea.
+ * Returns a Promise that resolves when the textarea is populated.
+ */
+async function loadFile(filename) {
+  if (!filename) return;
+
+  // Mark row + button selected
+  document.querySelectorAll('.file-table tr.selected').forEach(r => r.classList.remove('selected'));
+  document.querySelectorAll('.btn-use.active').forEach(b => b.classList.remove('active'));
+  const btn = document.querySelector(`.btn-use[data-filename="${CSS.escape(filename)}"]`);
+  btn?.closest('tr')?.classList.add('selected');
+  btn?.classList.add('active');
+
+  // Update selected-file badge
+  const badge = document.getElementById('input-file-badge');
+  if (badge) badge.textContent = `◫ ${filename}`;
+
+  // Update Number Family from filename immediately (before async fetch).
+  const fileDigit = filename.match(/^(\d)/)?.[1];
+  if (fileDigit && MATRIX[fileDigit]) {
+    _calcDigit     = null;
+    _calcActiveKey = null;
+    const sizeMatch = filename.match(/-(\d+)k\b/i);
+    if (sizeMatch) {
+      const length = parseInt(sizeMatch[1], 10) * 1000;
+      const dr     = repdigitDigitalRoot(parseInt(fileDigit, 10), length);
+      updateConstantsPanel(fileDigit, `vpc${dr}`);
+    } else {
+      updateConstantsPanel(fileDigit, null);
+    }
+  }
+
+  const mode = getFileMode();
+  if (mode === 'disk') {
+    setDiskHiddenField(filename);
+  } else {
+    clearDiskHiddenField();
+  }
+
+  const ta = document.getElementById('number-input');
+  if (ta) ta.value = mode === 'disk' ? 'Loading preview…' : 'Loading…';
+
+  try {
+    const resp = await fetch(`/files/preview?name=${encodeURIComponent(filename)}`);
+    if (resp.ok) {
+      const text         = await resp.text();
+      const truncated    = resp.headers.get('X-Preview-Truncated') === 'true';
+      const totalDigits  = parseInt(resp.headers.get('X-File-Digits') || '0', 10);
+      if (ta) {
+        ta.value = text;
+        ta.dispatchEvent(new Event('input'));
+        if (truncated) {
+          const metaEl = document.getElementById('input-char-count');
+          if (metaEl) metaEl.textContent =
+            `${totalDigits.toLocaleString()} digits · showing first ${INPUT_DISPLAY_CAP.toLocaleString()}`;
+        }
+      }
+    } else {
+      if (mode === 'disk' && ta) {
+        ta.value = '';
+        ta.placeholder = `[Disk-Direct] ${filename} — content will be read from server on Calculate`;
+      } else if (ta) {
+        const msg = await resp.text();
+        ta.value = '';
+        alert(`Could not load file over HTTP:\n${msg}`);
+      }
+    }
+  } catch (_) {
+    if (ta) { ta.value = ''; ta.placeholder = `[Disk-Direct] ${filename}`; }
+  }
+}
+
+/* ============================================================
    FILE BROWSER — "Use" button, mode-aware
-   Always fetches and shows content in textarea.
-   Disk mode additionally sets the hidden filename field.
    ============================================================ */
 function initFileBrowser() {
   document.querySelectorAll('.btn-use').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const filename = btn.dataset.filename;
-      if (!filename) return;
-
-      // Mark row selected
-      document.querySelectorAll('.file-table tr.selected').forEach(r => r.classList.remove('selected'));
-      btn.closest('tr')?.classList.add('selected');
-      document.querySelectorAll('.btn-use.active').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-
-      // Update selected-file badge next to Input Number label
-      const badge = document.getElementById('input-file-badge');
-      if (badge) badge.textContent = `◫ ${filename}`;
-
-      // Immediately update Number Family from filename (e.g. "6-1k.txt" → digit 6).
-      // Fires before the async preview fetch so the panel updates instantly on click.
-      const fileDigit = filename.match(/^(\d)/)?.[1];
-      if (fileDigit && MATRIX[fileDigit]) {
-        _calcDigit     = null;
-        _calcActiveKey = null;
-        // For standard "N-Mk.txt" filenames (e.g. "2-1k.txt"), compute the VPC
-        // synchronously from digit + length so the constants panel is fully correct
-        // even before the async preview fetch fires onNumberInput.
-        const sizeMatch = filename.match(/-(\d+)k\b/i);
-        if (sizeMatch) {
-          const length = parseInt(sizeMatch[1], 10) * 1000;
-          const dr     = repdigitDigitalRoot(parseInt(fileDigit, 10), length);
-          updateConstantsPanel(fileDigit, `vpc${dr}`);
-        } else {
-          updateConstantsPanel(fileDigit, null);
-        }
-      }
-
-      const mode = getFileMode();
-
-      if (mode === 'disk') {
-        // Record filename so Flask reads from disk on Calculate
-        setDiskHiddenField(filename);
-        // Still fetch and show content so user can see what they're calculating
-        const ta = document.getElementById('number-input');
-        if (ta) ta.value = 'Loading preview…';
-        try {
-          const resp = await fetch(`/files/preview?name=${encodeURIComponent(filename)}`);
-          if (resp.ok) {
-            const text = await resp.text();
-            const truncated = resp.headers.get('X-Preview-Truncated') === 'true';
-            const totalDigits = parseInt(resp.headers.get('X-File-Digits') || '0', 10);
-            if (ta) {
-              ta.value = text;  // backend already caps at PREVIEW_CAP
-              ta.dispatchEvent(new Event('input'));
-              if (truncated) {
-                const metaEl = document.getElementById('input-char-count');
-                if (metaEl) metaEl.textContent =
-                  `${totalDigits.toLocaleString()} digits · showing first ${INPUT_DISPLAY_CAP.toLocaleString()}`;
-              }
-            }
-          } else {
-            // HTTP transfer disabled (403) or other server error
-            if (ta) {
-              ta.value = '';
-              ta.placeholder = `[Disk-Direct] ${filename} — content will be read from server on Calculate`;
-            }
-          }
-        } catch (_) {
-          if (ta) { ta.value = ''; ta.placeholder = `[Disk-Direct] ${filename}`; }
-        }
-        return;
-      }
-
-      // HTTP mode: fetch content into textarea, no hidden file field
-      clearDiskHiddenField();
-      const ta = document.getElementById('number-input');
-      if (ta) ta.value = 'Loading…';
-      try {
-        const resp = await fetch(`/files/preview?name=${encodeURIComponent(filename)}`);
-        if (!resp.ok) {
-          const msg = await resp.text();
-          if (ta) ta.value = '';
-          alert(`Could not load file over HTTP:\n${msg}`);
-          return;
-        }
-        const text = await resp.text();
-        const truncated = resp.headers.get('X-Preview-Truncated') === 'true';
-        const totalDigits = parseInt(resp.headers.get('X-File-Digits') || '0', 10);
-        if (ta) {
-          ta.value = text;
-          ta.dispatchEvent(new Event('input'));
-          if (truncated) {
-            const metaEl = document.getElementById('input-char-count');
-            if (metaEl) metaEl.textContent =
-              `${totalDigits.toLocaleString()} digits · showing first ${INPUT_DISPLAY_CAP.toLocaleString()}`;
-          }
-        }
-      } catch (err) {
-        if (ta) ta.value = '';
-        console.error('File preview failed:', err);
-      }
-    });
+    btn.addEventListener('click', () => loadFile(btn.dataset.filename));
   });
 
   // When user switches modes, clear disk hidden field (keep textarea content)
@@ -841,7 +850,7 @@ function onResultSwap() {
 
   // Update Matrix Constants panel to reflect the active constant in this result.
   // Detects digit family (via hpl) and active vpc (via tile-alignment check).
-  const detected = detectConstantsFromResult(_resultFull);
+  const detected = detectConstantsFromResult(_resultFull, _calcDigit || null);
   if (detected) updateConstantsPanel(detected.digit, detected.vpcKey);
 
   // True total result length (may be larger than the 10 000-char preview).
