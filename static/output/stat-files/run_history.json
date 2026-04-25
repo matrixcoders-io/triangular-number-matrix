@@ -1,293 +1,5 @@
 [
   {
-    "ts": "2026-04-24T02:15:38",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.021819
-  },
-  {
-    "ts": "2026-04-24T02:15:48",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.020305
-  },
-  {
-    "ts": "2026-04-24T02:15:48",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.019012
-  },
-  {
-    "ts": "2026-04-24T02:15:49",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.021022
-  },
-  {
-    "ts": "2026-04-24T02:15:49",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.018478
-  },
-  {
-    "ts": "2026-04-24T02:15:50",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.021123
-  },
-  {
-    "ts": "2026-04-24T02:15:51",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.019682
-  },
-  {
-    "ts": "2026-04-24T02:15:52",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.019528
-  },
-  {
-    "ts": "2026-04-24T02:15:52",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.021032
-  },
-  {
-    "ts": "2026-04-24T02:15:53",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.015843
-  },
-  {
-    "ts": "2026-04-24T02:16:04",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.023413
-  },
-  {
-    "ts": "2026-04-24T02:16:05",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.021991
-  },
-  {
-    "ts": "2026-04-24T02:16:05",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.02054
-  },
-  {
-    "ts": "2026-04-24T02:16:06",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.018292
-  },
-  {
-    "ts": "2026-04-24T02:16:06",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.020912
-  },
-  {
-    "ts": "2026-04-24T02:16:07",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.021546
-  },
-  {
-    "ts": "2026-04-24T02:16:08",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.021001
-  },
-  {
-    "ts": "2026-04-24T02:16:09",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.018591
-  },
-  {
-    "ts": "2026-04-24T02:16:10",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.02158
-  },
-  {
-    "ts": "2026-04-24T02:16:13",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.020335
-  },
-  {
-    "ts": "2026-04-24T02:16:14",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.01983
-  },
-  {
-    "ts": "2026-04-24T02:16:14",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.019815
-  },
-  {
-    "ts": "2026-04-24T02:16:15",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.021155
-  },
-  {
-    "ts": "2026-04-24T02:16:15",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.020724
-  },
-  {
-    "ts": "2026-04-24T02:16:16",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.020582
-  },
-  {
-    "ts": "2026-04-24T02:16:17",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.021278
-  },
-  {
-    "ts": "2026-04-24T02:16:17",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.020139
-  },
-  {
-    "ts": "2026-04-24T02:16:18",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.019422
-  },
-  {
-    "ts": "2026-04-24T02:16:28",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.019236
-  },
-  {
-    "ts": "2026-04-24T02:16:29",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.02081
-  },
-  {
-    "ts": "2026-04-24T02:16:30",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.021081
-  },
-  {
-    "ts": "2026-04-24T02:16:30",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.020345
-  },
-  {
-    "ts": "2026-04-24T02:16:31",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.020231
-  },
-  {
-    "ts": "2026-04-24T02:16:32",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.022832
-  },
-  {
-    "ts": "2026-04-24T02:16:40",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.022534
-  },
-  {
-    "ts": "2026-04-24T02:16:40",
-    "method": "tri_matrix_stream",
-    "repdigit": "1",
-    "length": 1000,
-    "result_chars": 1998,
-    "elapsed": 0.020634
-  },
-  {
     "ts": "2026-04-24T02:16:41",
     "method": "tri_matrix_stream",
     "repdigit": "1",
@@ -798,5 +510,293 @@
     "length": 1000,
     "result_chars": 1998,
     "elapsed": 0.019895
+  },
+  {
+    "ts": "2026-04-24T21:58:48",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.00322
+  },
+  {
+    "ts": "2026-04-24T21:59:05",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.001221
+  },
+  {
+    "ts": "2026-04-24T21:59:08",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.001404
+  },
+  {
+    "ts": "2026-04-24T21:59:28",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.001808
+  },
+  {
+    "ts": "2026-04-24T21:59:38",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.001367
+  },
+  {
+    "ts": "2026-04-24T21:59:44",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.001521
+  },
+  {
+    "ts": "2026-04-24T21:59:44",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.001344
+  },
+  {
+    "ts": "2026-04-24T21:59:45",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.00172
+  },
+  {
+    "ts": "2026-04-24T21:59:45",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.001295
+  },
+  {
+    "ts": "2026-04-24T21:59:46",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.001378
+  },
+  {
+    "ts": "2026-04-24T21:59:47",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.001384
+  },
+  {
+    "ts": "2026-04-24T21:59:47",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.001355
+  },
+  {
+    "ts": "2026-04-24T21:59:48",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.002084
+  },
+  {
+    "ts": "2026-04-24T21:59:49",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.001849
+  },
+  {
+    "ts": "2026-04-24T21:59:50",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.001822
+  },
+  {
+    "ts": "2026-04-24T21:59:50",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.002796
+  },
+  {
+    "ts": "2026-04-24T21:59:51",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.003325
+  },
+  {
+    "ts": "2026-04-24T21:59:52",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.002641
+  },
+  {
+    "ts": "2026-04-24T21:59:52",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.00376
+  },
+  {
+    "ts": "2026-04-24T21:59:53",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.001243
+  },
+  {
+    "ts": "2026-04-24T21:59:53",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.001863
+  },
+  {
+    "ts": "2026-04-24T21:59:54",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.002598
+  },
+  {
+    "ts": "2026-04-24T21:59:54",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.000964
+  },
+  {
+    "ts": "2026-04-24T21:59:55",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.001052
+  },
+  {
+    "ts": "2026-04-24T21:59:55",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.001394
+  },
+  {
+    "ts": "2026-04-24T21:59:56",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.001391
+  },
+  {
+    "ts": "2026-04-24T22:00:15",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.002126
+  },
+  {
+    "ts": "2026-04-24T22:00:17",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.002074
+  },
+  {
+    "ts": "2026-04-24T22:00:18",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.001369
+  },
+  {
+    "ts": "2026-04-24T22:00:22",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.001538
+  },
+  {
+    "ts": "2026-04-24T22:00:29",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.001478
+  },
+  {
+    "ts": "2026-04-24T22:00:32",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.000866
+  },
+  {
+    "ts": "2026-04-24T22:00:36",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.001434
+  },
+  {
+    "ts": "2026-04-24T22:00:39",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.002229
+  },
+  {
+    "ts": "2026-04-24T22:00:42",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.001728
+  },
+  {
+    "ts": "2026-04-24T22:00:45",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 1000,
+    "result_chars": 1998,
+    "elapsed": 0.001322
   }
 ]
