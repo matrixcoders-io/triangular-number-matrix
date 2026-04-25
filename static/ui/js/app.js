@@ -636,18 +636,20 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   }
 
   // Body rows k=1..cap: k tiles on each side, growing wider per row.
-  // Left:  outermost k left tiles → leftFull[0..k-1]       (start of TN, farthest from VPC)
-  // Right (k < cap): VPC-adjacent k tiles → rightFull[0..k-1]  (inner, unchanged by increment)
-  // Right (k = cap): original end-window → rightFull[M-cap..M-1] (shows actual tail of TN)
+  // Left:  outermost k tiles → leftFull[0..k-1]          (start of TN, farthest from VPC)
+  // Right (k < cap): VPC-adjacent → rightFull[0..k-1]    (inner tiles, no mirroring between rows)
+  // Right (k = cap): end-window  → rightFull[M-cap..M-1] (actual tail of TN, shows changed digits)
   //
-  // rStart switches at k=cap so that all rows except the bottom show only inner repeating tiles —
-  // eliminating the "mirroring" where a changed digit appears at the same column in adjacent rows.
-  // The bottom row (k=cap) uses the end-window to preserve green highlights on changed digits.
-  // For pure repdigit all tiles are equal so both windows produce identical output.
+  // Two-region design:
+  //   Upper rows (k<cap) use VPC-adjacent tiles — all inner rotation, all amber for pure repdigit.
+  //   Bottom row (k=cap) uses the true end-window — changed digits from any increment show green.
+  //   No mirroring: k<cap rows and k=cap row draw from independent positions, so a changed tile
+  //   never appears at the same column in adjacent rows.
+  //   For pure repdigit all tiles are equal so both windows produce identical amber output.
   //
-  // rightBaseline: inner repeating tile for coloring (rightFull[M-cap] per session-6 QA rule).
-  //   - Pure repdigit: all tiles equal hpr rotation → all amber.
-  //   - After increment: inner tiles match → amber; changed end tiles differ → green (bottom row only).
+  // rightBaseline: inner repeating tile (rightFull[M-cap]) used by colorizeStr for all rows.
+  //   Upper rows: tiles match baseline → all amber.
+  //   Bottom row: inner tiles match → amber; changed end tiles differ → green.
   const rightBaseline = rightFull[M - cap];
 
   for (let k = 1; k <= cap; k++) {
