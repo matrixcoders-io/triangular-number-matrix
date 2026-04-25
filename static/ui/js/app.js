@@ -636,18 +636,18 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   }
 
   // Body rows k=1..cap: k tiles on each side, growing wider per row.
-  // Left:  outermost k left tiles  → leftFull[0..k-1]    (start of number, farthest from VPC)
-  // Right: window [M-cap..M-cap+k-1] — a fixed cap-wide slice at the far end, revealed one tile
-  //        per row.  Row k=cap shows the full window including rightFull[M-1] (last tile, correct
-  //        last digit).  Rows k<cap end at rightFull[M-cap+k-1], showing the repeating inner
-  //        pattern rather than always anchoring to the last tile.
-  // leftPad keeps VPC column fixed at gapCol = cap*hplLen + leftRemLen for every row.
+  // Left:  outermost k left tiles → leftFull[0..k-1]       (start of TN, farthest from VPC)
+  // Right (k < cap): VPC-adjacent k tiles → rightFull[0..k-1]  (inner, unchanged by increment)
+  // Right (k = cap): original end-window → rightFull[M-cap..M-1] (shows actual tail of TN)
   //
-  // rightBaseline: the expected repeating tile.
-  //   - Pure repdigit: rightFull[M-cap] = hpr exactly.
-  //   - After increment: rightFull[M-cap] = a fixed rotation of hpr (all inner tiles equal it).
-  // Comparing each tile to rightBaseline highlights tiles that DIFFER (the changed last tile)
-  // while unchanged inner tiles match fully → entire tile amber. Changed tile → partial/no amber.
+  // rStart switches at k=cap so that all rows except the bottom show only inner repeating tiles —
+  // eliminating the "mirroring" where a changed digit appears at the same column in adjacent rows.
+  // The bottom row (k=cap) uses the end-window to preserve green highlights on changed digits.
+  // For pure repdigit all tiles are equal so both windows produce identical output.
+  //
+  // rightBaseline: inner repeating tile for coloring (rightFull[M-cap] per session-6 QA rule).
+  //   - Pure repdigit: all tiles equal hpr rotation → all amber.
+  //   - After increment: inner tiles match → amber; changed end tiles differ → green (bottom row only).
   const rightBaseline = rightFull[M - cap];
 
   for (let k = 1; k <= cap; k++) {
@@ -659,12 +659,13 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
       for (let i = 0; i < k; i++) leftContent += leftFull[i];
     }
 
+    const rStart = (k < cap) ? 0 : (M - cap);
     let rightContent = '';
     if (highlightHpr) {
-      for (let i = M - cap; i < M - cap + k; i++)
+      for (let i = rStart; i < rStart + k; i++)
         rightContent += colorizeStr(rightFull[i], rightBaseline, 'hpr-match');
     } else {
-      for (let i = M - cap; i < M - cap + k; i++) rightContent += rightFull[i];
+      for (let i = rStart; i < rStart + k; i++) rightContent += rightFull[i];
     }
 
     // leftPad: text length of leftContent = k*hplLen (no partial).
