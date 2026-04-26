@@ -133,6 +133,13 @@ function detectConstantsFromResult(text, hintDigit = null) {
       const vpc = data[key];
       if (vpc && vpc !== '—' && text.includes(vpc)) return { digit: hintDigit, vpcKey: key };
     }
+    // Fuzzy fallback: exact vpc not found (increment changed the constant).
+    // Try 2-of-3 fuzzy match from center outward for each vpc key.
+    for (const key of vpcKeys) {
+      const vpc = data[key];
+      if (!vpc || vpc === '—') continue;
+      if (findFuzzyVpcIdx(text, vpc, data.hpl)) return { digit: hintDigit, vpcKey: key };
+    }
     return { digit: hintDigit, vpcKey: null };
   }
 
@@ -526,6 +533,26 @@ function colorizeStr(str, expected, cssClass) {
 }
 
 /**
+ * Render the VPC apex span.
+ * Exact match (wildPos null): entire value in vpc-highlight.
+ * Fuzzy match: matched chars in vpc-highlight, changed char as plain text (renders green).
+ */
+function vpcApexHtml(matchedVpc, wildPos) {
+  if (wildPos === null || wildPos === undefined) {
+    return '<span class="vpc-highlight">' + matchedVpc + '</span>';
+  }
+  let html = '';
+  for (let i = 0; i < matchedVpc.length; i++) {
+    if (i === wildPos) {
+      html += matchedVpc[i]; // plain — inherits green (this digit was changed by increment)
+    } else {
+      html += '<span class="vpc-highlight">' + matchedVpc[i] + '</span>';
+    }
+  }
+  return html;
+}
+
+/**
  * Find the VPC index using tile-alignment verification.
  * Rejects coincidental VPC occurrences (e.g. in a +1 incremented TN) by checking
  * that the tile immediately to the left of the candidate position matches hpl.
@@ -552,6 +579,53 @@ function findBestVpcIdx(text, vpcVal, hpl) {
   return fallback;
 }
 
+/**
+ * Fuzzy VPC search when exact match fails.
+ * Expands outward from the text midpoint (VPC is always near the center).
+ * Tries all vpcLen wildcard positions: any single char may differ from vpcVal.
+ * Returns { idx, matchedVpc, wildPos } for the first tile-aligned fuzzy match,
+ * or the first fuzzy match closest to center if no tile-aligned one is found.
+ */
+function findFuzzyVpcIdx(text, vpcVal, hpl) {
+  const vpcLen = vpcVal.length;
+  const hplLen = hpl.length;
+  const mid    = Math.floor(text.length / 2);
+
+  let firstFuzzy = null; // closest-to-center fuzzy match (fallback if no tile-aligned)
+
+  for (let offset = 0; offset <= mid + vpcLen; offset++) {
+    const positions = offset === 0 ? [mid] : [mid - offset, mid + offset];
+    for (const pos of positions) {
+      if (pos < 0 || pos + vpcLen > text.length) continue;
+      const candidate = text.slice(pos, pos + vpcLen);
+
+      for (let wildPos = 0; wildPos < vpcLen; wildPos++) {
+        let ok = true;
+        for (let i = 0; i < vpcLen; i++) {
+          if (i === wildPos) {
+            if (!/\d/.test(candidate[i])) { ok = false; break; }
+          } else {
+            if (candidate[i] !== vpcVal[i]) { ok = false; break; }
+          }
+        }
+        if (!ok) continue;
+
+        // Fuzzy match found — save as fallback (first = closest to center)
+        if (!firstFuzzy) firstFuzzy = { idx: pos, matchedVpc: candidate, wildPos };
+
+        // Prefer a tile-aligned occurrence
+        for (let lr = 0; lr < hplLen; lr++) {
+          if (pos >= hplLen + lr && text.slice(pos - hplLen - lr, pos - lr) === hpl) {
+            return { idx: pos, matchedVpc: candidate, wildPos };
+          }
+        }
+      }
+    }
+  }
+
+  return firstFuzzy; // null if nothing matched at all
+}
+
 function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   if (!vpcVal || vpcVal === '—') return null;
   if (!hpl || hpl === '—' || !hpr || hpr === '—') return null;
@@ -567,11 +641,25 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   }
 
   // Find vpcIdx with tile-alignment verification (rejects coincidental matches in changed zones).
-  const vpcIdx = findBestVpcIdx(text, vpcVal, hpl);
+  let vpcIdx      = findBestVpcIdx(text, vpcVal, hpl);
+  let activeVpc   = vpcVal;  // may be overridden by fuzzy match
+  let vpcWildPos  = null;    // null = exact match; 0/1/2 = which char was changed
+
+  if (vpcIdx === -1) {
+    // Exact match failed — try 2-of-3 fuzzy match expanding from center outward.
+    const fuzzy = findFuzzyVpcIdx(text, vpcVal, hpl);
+    if (fuzzy) {
+      vpcIdx     = fuzzy.idx;
+      activeVpc  = fuzzy.matchedVpc;
+      vpcWildPos = fuzzy.wildPos;
+      console.log('[buildPyramid] fuzzy VPC:', JSON.stringify(activeVpc),
+        '(expected', JSON.stringify(vpcVal) + ') at idx', vpcIdx, 'wildPos=', vpcWildPos);
+    }
+  }
   if (vpcIdx === -1) return null;
 
   const leftPart  = text.slice(0, vpcIdx);
-  const rightPart = text.slice(vpcIdx + vpcVal.length);
+  const rightPart = text.slice(vpcIdx + activeVpc.length);
 
   // Left: skip lc prefix, then split into full hpl tiles + leftRem (partial, closest to VPC).
   // Python build_left tiles L→R: full tiles then hpl[0:rem] at the end.
@@ -602,7 +690,7 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
 
   const N      = leftFull.length;
   const M      = rightFull.length;
-  const vpcLen = vpcVal.length;
+  const vpcLen = activeVpc.length;
 
   console.log('[buildPyramid] vpcIdx=' + vpcIdx + ' vpcVal=' + JSON.stringify(vpcVal) +
     ' leftRemLen=' + leftRemLen + ' rightRemLen=' + rightRemLen + ' N=' + N + ' M=' + M +
@@ -639,7 +727,7 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
     lines.push(
       ' '.repeat(cap * hplLen) +
       apexLeft +
-      '<span class="vpc-highlight">' + vpcVal + '</span>' +
+      vpcApexHtml(activeVpc, vpcWildPos) +
       apexRight
     );
   }
@@ -980,11 +1068,23 @@ document.addEventListener('keydown', (e) => {
    INCREMENT STEPPERS  (− / + buttons next to the Increment field)
    ============================================================ */
 function initIncrementSteppers() {
-  function step(delta) {
+  function getStep() {
+    const s = parseInt(document.getElementById('increment-step-l')?.value, 10);
+    return (isNaN(s) || s < 1) ? 1 : s;
+  }
+  // Keep both step inputs in sync
+  ['increment-step-l', 'increment-step-r'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', e => {
+      const otherId = id === 'increment-step-l' ? 'increment-step-r' : 'increment-step-l';
+      const other = document.getElementById(otherId);
+      if (other) other.value = e.target.value;
+    });
+  });
+  function step(sign) {
     const inp = document.getElementById('num2');
     if (!inp) return;
     const current = parseInt(inp.value, 10);
-    inp.value = (isNaN(current) ? 0 : current) + delta;
+    inp.value = (isNaN(current) ? 0 : current) + sign * getStep();
     document.querySelector('.btn-calculate')?.click();
   }
   document.getElementById('btn-increment-dec')?.addEventListener('click', () => step(-1));

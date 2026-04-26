@@ -935,6 +935,29 @@ body {
   background: var(--cyan-dim);
 }
 
+.increment-step {
+  min-width: 36px;
+  max-width: 80px;
+  width: auto;
+  text-align: center;
+  color: var(--gold);
+  background: var(--bg-input);
+  border: 1px solid var(--gold);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0 4px;
+  -moz-appearance: textfield;
+}
+.increment-step::-webkit-inner-spin-button,
+.increment-step::-webkit-outer-spin-button { -webkit-appearance: none; }
+.increment-step:focus {
+  outline: none;
+  border-color: var(--amber);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--amber) 25%, transparent);
+}
+
 .btn-download {
   margin-left: auto;
   background: var(--green-dim);
