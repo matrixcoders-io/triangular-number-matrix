@@ -44,10 +44,11 @@
         >{{ num1 or '' }}</textarea>
 
         <div class="calc-bottom-row">
-          <div class="form-group" style="flex: 0 0 150px;">
+          <div class="form-group" style="flex: 1; min-width: 0;">
             <div class="input-label">Increment</div>
             <div style="display:flex; align-items:stretch; gap:3px;">
               <button type="button" id="btn-increment-dec" class="btn-stepper">−</button>
+              <input type="number" id="increment-step-l" class="increment-step" value="10" min="1" title="Step size">
               <input
                 class="input-control"
                 type="text"
@@ -57,6 +58,7 @@
                 placeholder="0"
                 style="text-align:center; min-width:0; flex:1;"
               >
+              <input type="number" id="increment-step-r" class="increment-step" value="10" min="1" title="Step size">
               <button type="button" id="btn-increment-inc" class="btn-stepper">+</button>
             </div>
           </div>
@@ -98,7 +100,7 @@
         <div class="loading-bar"></div>
       </form>
 
-      {# ── Result (inset, below calculator controls) ── #}
+      {# ── Stats + Nav inset (display-only, no number output here) ── #}
       <div class="result-inset">
         <div class="result-inset-header">
           <span><span style="opacity:0.9;">⊕</span> Result</span>
@@ -152,14 +154,14 @@
           <div class="pattern-label">Left Horizontal Pattern</div>
           <div class="pattern-value-row">
             <div class="pattern-value" id="const-hpl">—</div>
-            <button id="toggle-hpl" class="pattern-toggle hpl" title="Highlight HPL matches in Pyramid view">OFF</button>
+            <button id="toggle-hpl" class="pattern-toggle hpl active" title="Highlight HPL matches in Pyramid view">ON</button>
           </div>
         </div>
         <div class="pattern-item">
           <div class="pattern-label">Right Horizontal Pattern</div>
           <div class="pattern-value-row">
             <div class="pattern-value" id="const-hpr">—</div>
-            <button id="toggle-hpr" class="pattern-toggle hpr" title="Highlight HPR matches in Pyramid view">OFF</button>
+            <button id="toggle-hpr" class="pattern-toggle hpr active" title="Highlight HPR matches in Pyramid view">ON</button>
           </div>
         </div>
       </div>
@@ -169,23 +171,24 @@
         <span class="badge badge-rpr" id="badge-rpr">—</span>
       </div>
 
-      <div class="active-indicator">
-        <div class="active-indicator-row">
-          <div class="active-indicator-col">
-            <div class="active-indicator-label">Active Constant</div>
-            <div class="active-indicator-value" id="active-const-value">—</div>
-          </div>
-          <div class="active-indicator-col">
-            <div class="active-indicator-label">Digital Root</div>
-            <div class="active-dr-value" id="active-dr-value">—</div>
-          </div>
-        </div>
-      </div>
+      {# Ghost elements — hidden, keep IDs alive for pyramid JS #}
+      <span id="active-const-value" style="display:none;"></span>
+      <span id="active-dr-value"    style="display:none;"></span>
 
     </div>
   </div>{# /constants panel #}
 
 </div>{# /top-grid #}
+
+
+{# ══════════════════════════════════════════════════════════════════
+   DISPLAY PANEL — full-width triangular number output
+   JS populates #number-display after every calculation.
+   Server pre-populates on GET /.
+   ══════════════════════════════════════════════════════════════════ #}
+<div class="display-panel">
+  <div class="number-display" id="number-display">{{ result or '' }}</div>
+</div>
 
 
 {# ══════════════════════════════════════════════════════════════════

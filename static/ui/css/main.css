@@ -167,11 +167,45 @@ body {
   gap: 20px;
 }
 
-/* Top two-column section */
+/* ── Top grid: Calculator (left) | Matrix Constants (right) ─────── */
 .top-grid {
   display: grid;
   grid-template-columns: 1fr 420px;
   gap: 20px;
+}
+
+/* Result inset inside Calculator panel */
+.result-inset {
+  border-top: 1px solid var(--border-dim);
+}
+
+.result-inset-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border-dim);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(56, 191, 248, 0.75);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Full-width triangular number display below top-grid */
+.display-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.display-panel .number-display {
+  border-radius: 0;
+  border: none;
+  max-height: 320px;
+  margin: 0;
 }
 
 /* ============================================================
@@ -776,45 +810,6 @@ body {
   width: 100%;
 }
 
-/* Result section embedded inside Calculator panel */
-.result-inset {
-  margin-top: 16px;
-  border-top: 1px solid var(--border-dim);
-  padding-top: 12px;
-}
-
-.result-inset-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(56, 191, 248, 0.75);
-}
-
-/* Strip horizontal padding — already inside panel-body */
-.result-inset .result-stats-bar {
-  padding: 10px 0;
-  background: none;
-  border-bottom: 1px solid var(--border-dim);
-}
-
-.result-inset .result-nav {
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border-dim);
-}
-
-.result-inset .number-display-wrap {
-  padding: 12px 0 0;
-}
-
-/* Compact empty state height */
-.result-inset .result-placeholder {
-  min-height: 80px;
-}
 
 .result-stats-bar {
   display: flex;
@@ -938,6 +933,29 @@ body {
   border-color: var(--cyan);
   color: var(--cyan);
   background: var(--cyan-dim);
+}
+
+.increment-step {
+  min-width: 36px;
+  max-width: 80px;
+  width: auto;
+  text-align: center;
+  color: var(--gold);
+  background: var(--bg-input);
+  border: 1px solid var(--gold);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0 4px;
+  -moz-appearance: textfield;
+}
+.increment-step::-webkit-inner-spin-button,
+.increment-step::-webkit-outer-spin-button { -webkit-appearance: none; }
+.increment-step:focus {
+  outline: none;
+  border-color: var(--amber);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--amber) 25%, transparent);
 }
 
 .btn-download {

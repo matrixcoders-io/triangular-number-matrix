@@ -108,7 +108,41 @@ function detectRepdigit(str) {
    (e.g. after increment where surrounding tiles changed).
    Returns { digit, vpcKey } or null.
    ============================================================ */
-function detectConstantsFromResult(text) {
+function detectConstantsFromResult(text, hintDigit = null) {
+  // Fast path: digit family already known — skip hpl scan, just find the vpc key.
+  // Prevents misidentification when increment shifts tiles near single-char hpl patterns.
+  if (hintDigit && MATRIX[hintDigit]) {
+    const data   = MATRIX[hintDigit];
+    const hplLen = data.hpl.length;
+    for (const key of vpcKeys) {
+      const vpc = data[key];
+      if (!vpc || vpc === '—') continue;
+      let searchFrom = 0;
+      while (searchFrom < text.length) {
+        const idx = text.indexOf(vpc, searchFrom);
+        if (idx === -1) break;
+        for (let lr = 0; lr < hplLen; lr++) {
+          if (idx >= hplLen + lr && text.slice(idx - hplLen - lr, idx - lr) === data.hpl) {
+            return { digit: hintDigit, vpcKey: key };
+          }
+        }
+        searchFrom = idx + 1;
+      }
+    }
+    for (const key of vpcKeys) {
+      const vpc = data[key];
+      if (vpc && vpc !== '—' && text.includes(vpc)) return { digit: hintDigit, vpcKey: key };
+    }
+    // Fuzzy fallback: exact vpc not found (increment changed the constant).
+    // Try 2-of-3 fuzzy match from center outward for each vpc key.
+    for (const key of vpcKeys) {
+      const vpc = data[key];
+      if (!vpc || vpc === '—') continue;
+      if (findFuzzyVpcIdx(text, vpc, data.hpl)) return { digit: hintDigit, vpcKey: key };
+    }
+    return { digit: hintDigit, vpcKey: null };
+  }
+
   for (const [digit, data] of Object.entries(MATRIX)) {
     if (!text.includes(data.hpl)) continue;
     const hplLen = data.hpl.length;
@@ -227,10 +261,13 @@ function onNumberInput(e) {
    ============================================================ */
 function initDigitSelector() {
   document.querySelectorAll('.digit-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const d = btn.dataset.digit;
       const key = (d === _calcDigit) ? _calcActiveKey : null;
       updateConstantsPanel(d, key);
+      // Load the minimum file for this digit family, then auto-calculate.
+      await loadFile(`${d}-1k.txt`);
+      document.querySelector('.btn-calculate')?.click();
     });
   });
   // Default: show digit 1 on load
@@ -261,110 +298,89 @@ function clearDiskHiddenField() {
 }
 
 /* ============================================================
+   FILE LOADER — shared by file browser Use buttons and digit selector
+   ============================================================ */
+
+/**
+ * Load a number file: mark it selected in the UI, update Number Family,
+ * set the disk hidden field (disk mode) or fetch content into textarea.
+ * Returns a Promise that resolves when the textarea is populated.
+ */
+async function loadFile(filename) {
+  if (!filename) return;
+
+  // Mark row + button selected
+  document.querySelectorAll('.file-table tr.selected').forEach(r => r.classList.remove('selected'));
+  document.querySelectorAll('.btn-use.active').forEach(b => b.classList.remove('active'));
+  const btn = document.querySelector(`.btn-use[data-filename="${CSS.escape(filename)}"]`);
+  btn?.closest('tr')?.classList.add('selected');
+  btn?.classList.add('active');
+
+  // Update selected-file badge
+  const badge = document.getElementById('input-file-badge');
+  if (badge) badge.textContent = `◫ ${filename}`;
+
+  // Update Number Family from filename immediately (before async fetch).
+  const fileDigit = filename.match(/^(\d)/)?.[1];
+  if (fileDigit && MATRIX[fileDigit]) {
+    _calcDigit     = null;
+    _calcActiveKey = null;
+    const sizeMatch = filename.match(/-(\d+)k\b/i);
+    if (sizeMatch) {
+      const length = parseInt(sizeMatch[1], 10) * 1000;
+      const dr     = repdigitDigitalRoot(parseInt(fileDigit, 10), length);
+      updateConstantsPanel(fileDigit, `vpc${dr}`);
+    } else {
+      updateConstantsPanel(fileDigit, null);
+    }
+  }
+
+  const mode = getFileMode();
+  if (mode === 'disk') {
+    setDiskHiddenField(filename);
+  } else {
+    clearDiskHiddenField();
+  }
+
+  const ta = document.getElementById('number-input');
+  if (ta) ta.value = mode === 'disk' ? 'Loading preview…' : 'Loading…';
+
+  try {
+    const resp = await fetch(`/files/preview?name=${encodeURIComponent(filename)}`);
+    if (resp.ok) {
+      const text         = await resp.text();
+      const truncated    = resp.headers.get('X-Preview-Truncated') === 'true';
+      const totalDigits  = parseInt(resp.headers.get('X-File-Digits') || '0', 10);
+      if (ta) {
+        ta.value = text;
+        ta.dispatchEvent(new Event('input'));
+        if (truncated) {
+          const metaEl = document.getElementById('input-char-count');
+          if (metaEl) metaEl.textContent =
+            `${totalDigits.toLocaleString()} digits · showing first ${INPUT_DISPLAY_CAP.toLocaleString()}`;
+        }
+      }
+    } else {
+      if (mode === 'disk' && ta) {
+        ta.value = '';
+        ta.placeholder = `[Disk-Direct] ${filename} — content will be read from server on Calculate`;
+      } else if (ta) {
+        const msg = await resp.text();
+        ta.value = '';
+        alert(`Could not load file over HTTP:\n${msg}`);
+      }
+    }
+  } catch (_) {
+    if (ta) { ta.value = ''; ta.placeholder = `[Disk-Direct] ${filename}`; }
+  }
+}
+
+/* ============================================================
    FILE BROWSER — "Use" button, mode-aware
-   Always fetches and shows content in textarea.
-   Disk mode additionally sets the hidden filename field.
    ============================================================ */
 function initFileBrowser() {
   document.querySelectorAll('.btn-use').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const filename = btn.dataset.filename;
-      if (!filename) return;
-
-      // Mark row selected
-      document.querySelectorAll('.file-table tr.selected').forEach(r => r.classList.remove('selected'));
-      btn.closest('tr')?.classList.add('selected');
-      document.querySelectorAll('.btn-use.active').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-
-      // Update selected-file badge next to Input Number label
-      const badge = document.getElementById('input-file-badge');
-      if (badge) badge.textContent = `◫ ${filename}`;
-
-      // Immediately update Number Family from filename (e.g. "6-1k.txt" → digit 6).
-      // Fires before the async preview fetch so the panel updates instantly on click.
-      const fileDigit = filename.match(/^(\d)/)?.[1];
-      if (fileDigit && MATRIX[fileDigit]) {
-        _calcDigit     = null;
-        _calcActiveKey = null;
-        // For standard "N-Mk.txt" filenames (e.g. "2-1k.txt"), compute the VPC
-        // synchronously from digit + length so the constants panel is fully correct
-        // even before the async preview fetch fires onNumberInput.
-        const sizeMatch = filename.match(/-(\d+)k\b/i);
-        if (sizeMatch) {
-          const length = parseInt(sizeMatch[1], 10) * 1000;
-          const dr     = repdigitDigitalRoot(parseInt(fileDigit, 10), length);
-          updateConstantsPanel(fileDigit, `vpc${dr}`);
-        } else {
-          updateConstantsPanel(fileDigit, null);
-        }
-      }
-
-      const mode = getFileMode();
-
-      if (mode === 'disk') {
-        // Record filename so Flask reads from disk on Calculate
-        setDiskHiddenField(filename);
-        // Still fetch and show content so user can see what they're calculating
-        const ta = document.getElementById('number-input');
-        if (ta) ta.value = 'Loading preview…';
-        try {
-          const resp = await fetch(`/files/preview?name=${encodeURIComponent(filename)}`);
-          if (resp.ok) {
-            const text = await resp.text();
-            const truncated = resp.headers.get('X-Preview-Truncated') === 'true';
-            const totalDigits = parseInt(resp.headers.get('X-File-Digits') || '0', 10);
-            if (ta) {
-              ta.value = text;  // backend already caps at PREVIEW_CAP
-              ta.dispatchEvent(new Event('input'));
-              if (truncated) {
-                const metaEl = document.getElementById('input-char-count');
-                if (metaEl) metaEl.textContent =
-                  `${totalDigits.toLocaleString()} digits · showing first ${INPUT_DISPLAY_CAP.toLocaleString()}`;
-              }
-            }
-          } else {
-            // HTTP transfer disabled (403) or other server error
-            if (ta) {
-              ta.value = '';
-              ta.placeholder = `[Disk-Direct] ${filename} — content will be read from server on Calculate`;
-            }
-          }
-        } catch (_) {
-          if (ta) { ta.value = ''; ta.placeholder = `[Disk-Direct] ${filename}`; }
-        }
-        return;
-      }
-
-      // HTTP mode: fetch content into textarea, no hidden file field
-      clearDiskHiddenField();
-      const ta = document.getElementById('number-input');
-      if (ta) ta.value = 'Loading…';
-      try {
-        const resp = await fetch(`/files/preview?name=${encodeURIComponent(filename)}`);
-        if (!resp.ok) {
-          const msg = await resp.text();
-          if (ta) ta.value = '';
-          alert(`Could not load file over HTTP:\n${msg}`);
-          return;
-        }
-        const text = await resp.text();
-        const truncated = resp.headers.get('X-Preview-Truncated') === 'true';
-        const totalDigits = parseInt(resp.headers.get('X-File-Digits') || '0', 10);
-        if (ta) {
-          ta.value = text;
-          ta.dispatchEvent(new Event('input'));
-          if (truncated) {
-            const metaEl = document.getElementById('input-char-count');
-            if (metaEl) metaEl.textContent =
-              `${totalDigits.toLocaleString()} digits · showing first ${INPUT_DISPLAY_CAP.toLocaleString()}`;
-          }
-        }
-      } catch (err) {
-        if (ta) ta.value = '';
-        console.error('File preview failed:', err);
-      }
-    });
+    btn.addEventListener('click', () => loadFile(btn.dataset.filename));
   });
 
   // When user switches modes, clear disk hidden field (keep textarea content)
@@ -411,8 +427,8 @@ let _currentPage      = 1;   // 1-based page number of current window
 let _totalPages       = 0;   // total pages = ceil(_resultTotalChars / RESULT_WINDOW)
 let _displayMode      = 'pyramid';  // 'standard' | 'pyramid'
 
-let _highlightHpl = false;  // HPL pattern highlight toggle
-let _highlightHpr = false;  // HPR pattern highlight toggle
+let _highlightHpl = true;  // HPL pattern highlight toggle
+let _highlightHpr = true;  // HPR pattern highlight toggle
 
 /** Convert 1-based page number to byte/char offset. */
 function pageToOffset(page) { return Math.max(0, page - 1) * RESULT_WINDOW; }
@@ -517,6 +533,26 @@ function colorizeStr(str, expected, cssClass) {
 }
 
 /**
+ * Render the VPC apex span.
+ * Exact match (wildPos null): entire value in vpc-highlight.
+ * Fuzzy match: matched chars in vpc-highlight, changed char as plain text (renders green).
+ */
+function vpcApexHtml(matchedVpc, wildPos) {
+  if (wildPos === null || wildPos === undefined) {
+    return '<span class="vpc-highlight">' + matchedVpc + '</span>';
+  }
+  let html = '';
+  for (let i = 0; i < matchedVpc.length; i++) {
+    if (i === wildPos) {
+      html += matchedVpc[i]; // plain — inherits green (this digit was changed by increment)
+    } else {
+      html += '<span class="vpc-highlight">' + matchedVpc[i] + '</span>';
+    }
+  }
+  return html;
+}
+
+/**
  * Find the VPC index using tile-alignment verification.
  * Rejects coincidental VPC occurrences (e.g. in a +1 incremented TN) by checking
  * that the tile immediately to the left of the candidate position matches hpl.
@@ -543,6 +579,53 @@ function findBestVpcIdx(text, vpcVal, hpl) {
   return fallback;
 }
 
+/**
+ * Fuzzy VPC search when exact match fails.
+ * Expands outward from the text midpoint (VPC is always near the center).
+ * Tries all vpcLen wildcard positions: any single char may differ from vpcVal.
+ * Returns { idx, matchedVpc, wildPos } for the first tile-aligned fuzzy match,
+ * or the first fuzzy match closest to center if no tile-aligned one is found.
+ */
+function findFuzzyVpcIdx(text, vpcVal, hpl) {
+  const vpcLen = vpcVal.length;
+  const hplLen = hpl.length;
+  const mid    = Math.floor(text.length / 2);
+
+  let firstFuzzy = null; // closest-to-center fuzzy match (fallback if no tile-aligned)
+
+  for (let offset = 0; offset <= mid + vpcLen; offset++) {
+    const positions = offset === 0 ? [mid] : [mid - offset, mid + offset];
+    for (const pos of positions) {
+      if (pos < 0 || pos + vpcLen > text.length) continue;
+      const candidate = text.slice(pos, pos + vpcLen);
+
+      for (let wildPos = 0; wildPos < vpcLen; wildPos++) {
+        let ok = true;
+        for (let i = 0; i < vpcLen; i++) {
+          if (i === wildPos) {
+            if (!/\d/.test(candidate[i])) { ok = false; break; }
+          } else {
+            if (candidate[i] !== vpcVal[i]) { ok = false; break; }
+          }
+        }
+        if (!ok) continue;
+
+        // Fuzzy match found — save as fallback (first = closest to center)
+        if (!firstFuzzy) firstFuzzy = { idx: pos, matchedVpc: candidate, wildPos };
+
+        // Prefer a tile-aligned occurrence
+        for (let lr = 0; lr < hplLen; lr++) {
+          if (pos >= hplLen + lr && text.slice(pos - hplLen - lr, pos - lr) === hpl) {
+            return { idx: pos, matchedVpc: candidate, wildPos };
+          }
+        }
+      }
+    }
+  }
+
+  return firstFuzzy; // null if nothing matched at all
+}
+
 function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   if (!vpcVal || vpcVal === '—') return null;
   if (!hpl || hpl === '—' || !hpr || hpr === '—') return null;
@@ -558,11 +641,25 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   }
 
   // Find vpcIdx with tile-alignment verification (rejects coincidental matches in changed zones).
-  const vpcIdx = findBestVpcIdx(text, vpcVal, hpl);
+  let vpcIdx      = findBestVpcIdx(text, vpcVal, hpl);
+  let activeVpc   = vpcVal;  // may be overridden by fuzzy match
+  let vpcWildPos  = null;    // null = exact match; 0/1/2 = which char was changed
+
+  if (vpcIdx === -1) {
+    // Exact match failed — try 2-of-3 fuzzy match expanding from center outward.
+    const fuzzy = findFuzzyVpcIdx(text, vpcVal, hpl);
+    if (fuzzy) {
+      vpcIdx     = fuzzy.idx;
+      activeVpc  = fuzzy.matchedVpc;
+      vpcWildPos = fuzzy.wildPos;
+      console.log('[buildPyramid] fuzzy VPC:', JSON.stringify(activeVpc),
+        '(expected', JSON.stringify(vpcVal) + ') at idx', vpcIdx, 'wildPos=', vpcWildPos);
+    }
+  }
   if (vpcIdx === -1) return null;
 
   const leftPart  = text.slice(0, vpcIdx);
-  const rightPart = text.slice(vpcIdx + vpcVal.length);
+  const rightPart = text.slice(vpcIdx + activeVpc.length);
 
   // Left: skip lc prefix, then split into full hpl tiles + leftRem (partial, closest to VPC).
   // Python build_left tiles L→R: full tiles then hpl[0:rem] at the end.
@@ -593,7 +690,7 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
 
   const N      = leftFull.length;
   const M      = rightFull.length;
-  const vpcLen = vpcVal.length;
+  const vpcLen = activeVpc.length;
 
   console.log('[buildPyramid] vpcIdx=' + vpcIdx + ' vpcVal=' + JSON.stringify(vpcVal) +
     ' leftRemLen=' + leftRemLen + ' rightRemLen=' + rightRemLen + ' N=' + N + ' M=' + M +
@@ -630,24 +727,26 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
     lines.push(
       ' '.repeat(cap * hplLen) +
       apexLeft +
-      '<span class="vpc-highlight">' + vpcVal + '</span>' +
+      vpcApexHtml(activeVpc, vpcWildPos) +
       apexRight
     );
   }
 
   // Body rows k=1..cap: k tiles on each side, growing wider per row.
-  // Left:  outermost k left tiles  → leftFull[0..k-1]    (start of number, farthest from VPC)
-  // Right: window [M-cap..M-cap+k-1] — a fixed cap-wide slice at the far end, revealed one tile
-  //        per row.  Row k=cap shows the full window including rightFull[M-1] (last tile, correct
-  //        last digit).  Rows k<cap end at rightFull[M-cap+k-1], showing the repeating inner
-  //        pattern rather than always anchoring to the last tile.
-  // leftPad keeps VPC column fixed at gapCol = cap*hplLen + leftRemLen for every row.
+  // Left:  outermost k tiles → leftFull[0..k-1]          (start of TN, farthest from VPC)
+  // Right (k < cap): VPC-adjacent → rightFull[0..k-1]    (inner tiles, no mirroring between rows)
+  // Right (k = cap): end-window  → rightFull[M-cap..M-1] (actual tail of TN, shows changed digits)
   //
-  // rightBaseline: the expected repeating tile.
-  //   - Pure repdigit: rightFull[M-cap] = hpr exactly.
-  //   - After increment: rightFull[M-cap] = a fixed rotation of hpr (all inner tiles equal it).
-  // Comparing each tile to rightBaseline highlights tiles that DIFFER (the changed last tile)
-  // while unchanged inner tiles match fully → entire tile amber. Changed tile → partial/no amber.
+  // Two-region design:
+  //   Upper rows (k<cap) use VPC-adjacent tiles — all inner rotation, all amber for pure repdigit.
+  //   Bottom row (k=cap) uses the true end-window — changed digits from any increment show green.
+  //   No mirroring: k<cap rows and k=cap row draw from independent positions, so a changed tile
+  //   never appears at the same column in adjacent rows.
+  //   For pure repdigit all tiles are equal so both windows produce identical amber output.
+  //
+  // rightBaseline: inner repeating tile (rightFull[M-cap]) used by colorizeStr for all rows.
+  //   Upper rows: tiles match baseline → all amber.
+  //   Bottom row: inner tiles match → amber; changed end tiles differ → green.
   const rightBaseline = rightFull[M - cap];
 
   for (let k = 1; k <= cap; k++) {
@@ -659,12 +758,13 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
       for (let i = 0; i < k; i++) leftContent += leftFull[i];
     }
 
+    const rStart = (k < cap) ? 0 : (M - cap);
     let rightContent = '';
     if (highlightHpr) {
-      for (let i = M - cap; i < M - cap + k; i++)
+      for (let i = rStart; i < rStart + k; i++)
         rightContent += colorizeStr(rightFull[i], rightBaseline, 'hpr-match');
     } else {
-      for (let i = M - cap; i < M - cap + k; i++) rightContent += rightFull[i];
+      for (let i = rStart; i < rStart + k; i++) rightContent += rightFull[i];
     }
 
     // leftPad: text length of leftContent = k*hplLen (no partial).
@@ -838,7 +938,7 @@ function onResultSwap() {
 
   // Update Matrix Constants panel to reflect the active constant in this result.
   // Detects digit family (via hpl) and active vpc (via tile-alignment check).
-  const detected = detectConstantsFromResult(_resultFull);
+  const detected = detectConstantsFromResult(_resultFull, _calcDigit || null);
   if (detected) updateConstantsPanel(detected.digit, detected.vpcKey);
 
   // True total result length (may be larger than the 10 000-char preview).
@@ -968,11 +1068,23 @@ document.addEventListener('keydown', (e) => {
    INCREMENT STEPPERS  (− / + buttons next to the Increment field)
    ============================================================ */
 function initIncrementSteppers() {
-  function step(delta) {
+  function getStep() {
+    const s = parseInt(document.getElementById('increment-step-l')?.value, 10);
+    return (isNaN(s) || s < 1) ? 1 : s;
+  }
+  // Keep both step inputs in sync
+  ['increment-step-l', 'increment-step-r'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', e => {
+      const otherId = id === 'increment-step-l' ? 'increment-step-r' : 'increment-step-l';
+      const other = document.getElementById(otherId);
+      if (other) other.value = e.target.value;
+    });
+  });
+  function step(sign) {
     const inp = document.getElementById('num2');
     if (!inp) return;
     const current = parseInt(inp.value, 10);
-    inp.value = (isNaN(current) ? 0 : current) + delta;
+    inp.value = (isNaN(current) ? 0 : current) + sign * getStep();
     document.querySelector('.btn-calculate')?.click();
   }
   document.getElementById('btn-increment-dec')?.addEventListener('click', () => step(-1));

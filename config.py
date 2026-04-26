@@ -13,6 +13,13 @@ STAT_FILES_DIR = os.path.join(OUTPUT_DIR, "stat-files")
 CONFIGS_DIR    = os.path.join(BASE_DIR, "static", "configs")
 WINDOWS_JSON   = os.path.join(CONFIGS_DIR, "windows.json")
 
+# Allowlist for files the calculator will accept. Use ["*"] to allow any file in NUMBERS_DIR.
+ALLOWED_FILES = [
+    "1-1k.txt", "2-1k.txt", "3-1k.txt", "4-1k.txt", "5-1k.txt",
+    "6-1k.txt", "7-1k.txt", "8-1k.txt", "9-1k.txt",
+    "1-1m.txt", "1-10m.txt", "1-100m.txt", "1-1b.txt", "1-5b.txt",
+]
+
 # --- Calculator defaults ---
 DEFAULT_CHUNK_CHARS = 8_388_608  # 8 MiB per chunk for streaming/memory modes
 TN_OUT_FILE     = os.path.join(TN_FILES_DIR, "tn-file.txt")

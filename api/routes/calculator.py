@@ -24,6 +24,7 @@ from config import (
     WINDOWS_JSON,
     UI_HTTP_FILE_TRANSFER,
     UI_HTTP_FILE_MAX_DIGITS,
+    ALLOWED_FILES,
 )
 from api.routes.stats import _load_history, _save_history, _update_leaderboard
 
@@ -123,6 +124,14 @@ def handle_big_number_math(request_type: str):
 
             # Disk-direct: read file from server, overrides textarea content
             if file_mode == "disk" and file_name:
+                if ".." in file_name or "/" in file_name or "\\" in file_name:
+                    return render_template("partials/result_panel.html", error="Invalid file name.")
+                if ALLOWED_FILES != ["*"] and file_name not in ALLOWED_FILES:
+                    allowed = ", ".join(ALLOWED_FILES)
+                    return render_template(
+                        "partials/result_panel.html",
+                        error=f"File '{file_name}' is not permitted. Allowed files: {allowed}",
+                    )
                 num1 = read_file_content(os.path.join(NUMBERS_DIR, file_name))
                 file_load_time = str(time.perf_counter() - start_time)
                 logger.info("Loading file from disk: %s/%s", NUMBERS_DIR, file_name)
