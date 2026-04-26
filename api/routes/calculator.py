@@ -263,6 +263,7 @@ def handle_big_number_math(request_type: str):
                 repdigit = num1[0] if num1 else ""
                 result_str = str(result)
                 history = _load_history()
+                _mid = len(result_str) // 2
                 history.append({
                     "ts":           time.strftime("%Y-%m-%dT%H:%M:%S"),
                     "method":       operation,
@@ -270,6 +271,9 @@ def handle_big_number_math(request_type: str):
                     "length":       len(num1),
                     "result_chars": len(result_str),
                     "elapsed":      round(elapsed, 6),
+                    "increment":    int(num2) if num2 and num2.lstrip('-').isdigit() else 0,
+                    "mid_pattern":  result_str[max(0, _mid - 15): _mid + 15],
+                    "end_pattern":  result_str[-30:],
                 })
                 try:
                     _save_history(history)
