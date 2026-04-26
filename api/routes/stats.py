@@ -12,7 +12,7 @@ import logging
 
 from flask import Blueprint, request, jsonify
 
-from config import STAT_FILES_DIR
+from config import STAT_FILES_DIR, LEADERBOARD_MIN_INPUT
 
 logger = logging.getLogger(__name__)
 
@@ -39,35 +39,49 @@ def _save_history(history: list) -> None:
         json.dump(history[-MAX_HISTORY:], f, indent=2)
 
 
-def _load_leaderboard() -> dict:
+def _load_leaderboard() -> list:
     if not os.path.isfile(LEADERBOARD_FILE):
-        return {}
+        return []
     try:
         with open(LEADERBOARD_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+        if isinstance(data, dict):
+            # Migrate from old dict-keyed-by-method format to list
+            entries = list(data.values())
+            for e in entries:
+                e.setdefault("increment", 0)
+            _save_leaderboard(entries)  # persist immediately so migration only runs once
+            return entries
+        return data if isinstance(data, list) else []
     except Exception:
-        return {}
+        return []
 
 
-def _save_leaderboard(lb: dict) -> None:
+def _save_leaderboard(lb: list) -> None:
     os.makedirs(STAT_FILES_DIR, exist_ok=True)
     with open(LEADERBOARD_FILE, "w", encoding="utf-8") as f:
         json.dump(lb, f, indent=2)
 
 
 def _update_leaderboard(record: dict) -> None:
-    """Update leaderboard if this run is the highest-input (or fastest at same input) for its method."""
-    lb = _load_leaderboard()
+    """Add/update leaderboard for qualifying runs (length >= threshold, not random method)."""
     method = record.get("method", "")
-    if not method:
+    if not method or method == "tri_matrix_random":
         return
-    current = lb.get(method)
-    if (current is None
-            or record["length"] > current["length"]
-            or (record["length"] == current["length"]
-                and record["elapsed"] < current["elapsed"])):
-        lb[method] = record
-        _save_leaderboard(lb)
+    length = record.get("length", 0)
+    if length < LEADERBOARD_MIN_INPUT:
+        return
+
+    lb = _load_leaderboard()
+    for i, entry in enumerate(lb):
+        if entry.get("method") == method and entry.get("length") == length:
+            if record["elapsed"] < entry["elapsed"]:  # keep fastest
+                lb[i] = record
+                _save_leaderboard(lb)
+            return  # same key exists regardless of time
+
+    lb.append(record)
+    _save_leaderboard(lb)
 
 
 @stats_bp.route("/stats/history")
@@ -78,8 +92,10 @@ def get_history():
 
 @stats_bp.route("/stats/leaderboard")
 def get_leaderboard():
-    """Return the leaderboard as JSON (dict keyed by method)."""
-    return jsonify(_load_leaderboard())
+    """Return the leaderboard as a JSON array sorted by length desc, method asc."""
+    lb = _load_leaderboard()
+    lb_sorted = sorted(lb, key=lambda e: (-e.get("length", 0), e.get("method", "")))
+    return jsonify(lb_sorted)
 
 
 @stats_bp.route("/stats/history/append", methods=["POST"])

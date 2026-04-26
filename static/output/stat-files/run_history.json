@@ -1,29 +1,5 @@
 [
   {
-    "ts": "2026-04-25T20:55:05",
-    "method": "tri_matrix",
-    "repdigit": "4",
-    "length": 1000,
-    "result_chars": 1999,
-    "elapsed": 0.001983
-  },
-  {
-    "ts": "2026-04-25T20:55:05",
-    "method": "tri_matrix",
-    "repdigit": "4",
-    "length": 1000,
-    "result_chars": 1999,
-    "elapsed": 0.003678
-  },
-  {
-    "ts": "2026-04-25T20:55:06",
-    "method": "tri_matrix",
-    "repdigit": "4",
-    "length": 1000,
-    "result_chars": 1999,
-    "elapsed": 0.001272
-  },
-  {
     "ts": "2026-04-25T20:55:07",
     "method": "tri_matrix",
     "repdigit": "4",
@@ -822,5 +798,38 @@
     "increment": 40,
     "mid_pattern": "283950617283995493827160493827",
     "end_pattern": "160493827160493827160493827976"
+  },
+  {
+    "ts": "2026-04-26T10:06:35",
+    "method": "tri_matrix_stream",
+    "repdigit": "1",
+    "length": 5000000000,
+    "result_chars": 9999999998,
+    "elapsed": 30.120346,
+    "increment": 0,
+    "mid_pattern": "506172839506173271604938271604",
+    "end_pattern": "716049382716049382716049382716"
+  },
+  {
+    "ts": "2026-04-26T10:12:44",
+    "method": "tri_matrix_stream",
+    "repdigit": "1",
+    "length": 5000000000,
+    "result_chars": 9999999998,
+    "elapsed": 25.58499,
+    "increment": 0,
+    "mid_pattern": "506172839506173271604938271604",
+    "end_pattern": "716049382716049382716049382716"
+  },
+  {
+    "ts": "2026-04-26T10:19:28",
+    "method": "tri_matrix",
+    "repdigit": "1",
+    "length": 5000000000,
+    "result_chars": 9999999998,
+    "elapsed": 191.806138,
+    "increment": 0,
+    "mid_pattern": "506172839506173271604938271604",
+    "end_pattern": "716049382716049382716049382716"
   }
 ]
