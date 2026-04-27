@@ -133,13 +133,6 @@ function detectConstantsFromResult(text, hintDigit = null) {
       const vpc = data[key];
       if (vpc && vpc !== '—' && text.includes(vpc)) return { digit: hintDigit, vpcKey: key };
     }
-    // Fuzzy fallback: exact vpc not found (increment changed the constant).
-    // Try 2-of-3 fuzzy match from center outward for each vpc key.
-    for (const key of vpcKeys) {
-      const vpc = data[key];
-      if (!vpc || vpc === '—') continue;
-      if (findFuzzyVpcIdx(text, vpc, data.hpl)) return { digit: hintDigit, vpcKey: key };
-    }
     return { digit: hintDigit, vpcKey: null };
   }
 
@@ -628,15 +621,7 @@ function vpcApexHtml(matchedVpc, wildPos) {
   if (wildPos === null || wildPos === undefined) {
     return '<span class="vpc-highlight">' + matchedVpc + '</span>';
   }
-  let html = '';
-  for (let i = 0; i < matchedVpc.length; i++) {
-    if (i === wildPos) {
-      html += matchedVpc[i]; // plain — inherits green (this digit was changed by increment)
-    } else {
-      html += '<span class="vpc-highlight">' + matchedVpc[i] + '</span>';
-    }
-  }
-  return html;
+  return matchedVpc; // no exact match — plain text inherits green from .number-display
 }
 
 /**
@@ -666,52 +651,6 @@ function findBestVpcIdx(text, vpcVal, hpl) {
   return fallback;
 }
 
-/**
- * Fuzzy VPC search when exact match fails.
- * Expands outward from the text midpoint (VPC is always near the center).
- * Tries all vpcLen wildcard positions: any single char may differ from vpcVal.
- * Returns { idx, matchedVpc, wildPos } for the first tile-aligned fuzzy match,
- * or the first fuzzy match closest to center if no tile-aligned one is found.
- */
-function findFuzzyVpcIdx(text, vpcVal, hpl) {
-  const vpcLen = vpcVal.length;
-  const hplLen = hpl.length;
-  const mid    = Math.floor(text.length / 2);
-
-  let firstFuzzy = null; // closest-to-center fuzzy match (fallback if no tile-aligned)
-
-  for (let offset = 0; offset <= mid + vpcLen; offset++) {
-    const positions = offset === 0 ? [mid] : [mid - offset, mid + offset];
-    for (const pos of positions) {
-      if (pos < 0 || pos + vpcLen > text.length) continue;
-      const candidate = text.slice(pos, pos + vpcLen);
-
-      for (let wildPos = 0; wildPos < vpcLen; wildPos++) {
-        let ok = true;
-        for (let i = 0; i < vpcLen; i++) {
-          if (i === wildPos) {
-            if (!/\d/.test(candidate[i])) { ok = false; break; }
-          } else {
-            if (candidate[i] !== vpcVal[i]) { ok = false; break; }
-          }
-        }
-        if (!ok) continue;
-
-        // Fuzzy match found — save as fallback (first = closest to center)
-        if (!firstFuzzy) firstFuzzy = { idx: pos, matchedVpc: candidate, wildPos };
-
-        // Prefer a tile-aligned occurrence
-        for (let lr = 0; lr < hplLen; lr++) {
-          if (pos >= hplLen + lr && text.slice(pos - hplLen - lr, pos - lr) === hpl) {
-            return { idx: pos, matchedVpc: candidate, wildPos };
-          }
-        }
-      }
-    }
-  }
-
-  return firstFuzzy; // null if nothing matched at all
-}
 
 function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   if (!vpcVal || vpcVal === '—') return null;
@@ -729,21 +668,27 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
 
   // Find vpcIdx with tile-alignment verification (rejects coincidental matches in changed zones).
   let vpcIdx      = findBestVpcIdx(text, vpcVal, hpl);
-  let activeVpc   = vpcVal;  // may be overridden by fuzzy match
-  let vpcWildPos  = null;    // null = exact match; 0/1/2 = which char was changed
+  let activeVpc   = vpcVal;
+  let vpcWildPos  = null;    // null = exact match; -1 = no match (apex renders green)
+
+  // Reject false-positive VPC matches more than ~2 tile-widths from the text centre.
+  // A VPC found near the end/start is always a coincidental substring match, not the real apex.
+  if (vpcIdx !== -1) {
+    const mid       = Math.floor(text.length / 2);
+    const vpcCenter = vpcIdx + Math.floor(vpcVal.length / 2);
+    if (Math.abs(vpcCenter - mid) > hplLen * 2) vpcIdx = -1;
+  }
 
   if (vpcIdx === -1) {
-    // Exact match failed — try 2-of-3 fuzzy match expanding from center outward.
-    const fuzzy = findFuzzyVpcIdx(text, vpcVal, hpl);
-    if (fuzzy) {
-      vpcIdx     = fuzzy.idx;
-      activeVpc  = fuzzy.matchedVpc;
-      vpcWildPos = fuzzy.wildPos;
-      console.log('[buildPyramid] fuzzy VPC:', JSON.stringify(activeVpc),
-        '(expected', JSON.stringify(vpcVal) + ') at idx', vpcIdx, 'wildPos=', vpcWildPos);
-    }
+    // No exact match near centre — snap midpoint to the nearest HPL tile boundary so that
+    // leftTilesPart.length % hplLen === 0, guaranteeing colorizeStr(tile, hpl) compares at
+    // offset 0 (not mid-tile) and finds correct matches instead of rendering everything green.
+    const rawMid = Math.floor((text.length - vpcVal.length) / 2);
+    const modOff = ((rawMid - lcLen) % hplLen + hplLen) % hplLen;
+    vpcIdx    = modOff <= Math.floor(hplLen / 2) ? rawMid - modOff : rawMid + (hplLen - modOff);
+    activeVpc = text.slice(vpcIdx, vpcIdx + vpcVal.length);
+    vpcWildPos = -1;
   }
-  if (vpcIdx === -1) return null;
 
   const leftPart  = text.slice(0, vpcIdx);
   const rightPart = text.slice(vpcIdx + activeVpc.length);
