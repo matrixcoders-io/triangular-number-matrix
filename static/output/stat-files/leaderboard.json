@@ -36,12 +36,12 @@
     "increment": 0
   },
   {
-    "ts": "2026-04-26T10:12:44",
+    "ts": "2026-04-26T19:02:41",
     "method": "tri_matrix_stream",
     "repdigit": "1",
     "length": 5000000000,
     "result_chars": 9999999998,
-    "elapsed": 25.58499,
+    "elapsed": 21.590172,
     "increment": 0,
     "mid_pattern": "506172839506173271604938271604",
     "end_pattern": "716049382716049382716049382716"

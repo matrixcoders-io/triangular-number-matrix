@@ -31,9 +31,8 @@
           <span>Input Number
             <span class="input-meta" id="input-char-count">
               {% if num1 %}{{ num1 | length | string }} characters{% endif %}
-            </span>
+            </span><span id="input-file-badge" class="input-file-badge">{% if default_file %}<span style="color:var(--text-secondary)"> · filename </span><span style="color:var(--green)">◫</span> <strong style="color:var(--text-primary);font-weight:600">{{ default_file }}</strong>{% endif %}</span>
           </span>
-          <span id="input-file-badge" class="input-file-badge">{% if default_file %}◫ {{ default_file }}{% endif %}</span>
         </div>
         <textarea
           class="number-textarea"
@@ -207,20 +206,26 @@
             <th>File</th>
             <th>Size</th>
             <th></th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
           {% for f in file_names %}
-          <tr{% if f.name == default_file %} class="selected"{% endif %}>
+          <tr{% if f.name == default_file %} class="selected"{% endif %} data-filename="{{ f.name }}">
             <td><span class="file-name">{{ f.name }}</span></td>
             <td><span class="file-size">{{ f.size_display }}</span></td>
             <td>
               <button class="btn-use{% if f.name == default_file %} active{% endif %}" type="button" data-filename="{{ f.name }}">Use</button>
             </td>
+            <td>
+              <button class="btn-gen{% if not ui_file_generate_enabled %} btn-gen-disabled{% endif %}"
+                      type="button" data-filename="{{ f.name }}"
+                      {% if not ui_file_generate_enabled %}disabled{% endif %}>Generate</button>
+            </td>
           </tr>
           {% else %}
           <tr>
-            <td colspan="3" style="color: var(--text-muted); font-size: 0.8rem; padding: 12px 10px;">
+            <td colspan="4" style="color: var(--text-muted); font-size: 0.8rem; padding: 12px 10px;">
               No files found in static/numbers/
             </td>
           </tr>
@@ -373,6 +378,8 @@
 
 {% block scripts_extra %}
 <script>
+  const FILE_GENERATE_ENABLED = {{ 'true' if ui_file_generate_enabled else 'false' }};
+
   // ── Sync the ui_file_mode radio into the form hidden field ──────
   // The calculator form uses #file-mode-hidden (not the radio directly,
   // since the radio is outside the form).

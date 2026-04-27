@@ -242,7 +242,7 @@ function onNumberInput(e) {
   const metaEl = document.getElementById('input-char-count');
   if (metaEl) {
     if (isRepdigit) {
-      metaEl.textContent = `${length.toLocaleString()} digits · repdigit ${digit}`;
+      metaEl.innerHTML = `<strong style="color:var(--green)">${length.toLocaleString()}</strong><span style="color:var(--text-secondary)"> digits · repdigit </span><strong style="color:var(--gold)">${digit}</strong>`;
     } else if (e.target.value.trim()) {
       metaEl.textContent = `${e.target.value.trim().length.toLocaleString()} digits`;
     } else {
@@ -318,7 +318,7 @@ async function loadFile(filename) {
 
   // Update selected-file badge
   const badge = document.getElementById('input-file-badge');
-  if (badge) badge.textContent = `◫ ${filename}`;
+  if (badge) badge.innerHTML = `<span style="color:var(--text-secondary)"> · filename </span><span style="color:var(--green)">◫</span> <strong style="color:var(--text-primary);font-weight:600">${filename}</strong>`;
 
   // Update Number Family from filename immediately (before async fetch).
   const fileDigit = filename.match(/^(\d)/)?.[1];
@@ -394,6 +394,92 @@ function initFileBrowser() {
 }
 
 /* ============================================================
+   FILE GENERATE
+   ============================================================ */
+function initFileGenerate() {
+  document.querySelectorAll('.btn-gen:not(.btn-gen-disabled)').forEach(btn => {
+    btn.addEventListener('click', () => openGenPanel(btn));
+  });
+}
+
+function openGenPanel(btn) {
+  document.querySelectorAll('.gen-panel-row').forEach(r => r.remove());
+
+  const name = btn.dataset.filename;
+  if (!/^\d-\d+(k|m|b)\.txt$/.test(name)) {
+    alert('Cannot generate: filename does not match expected pattern.');
+    return;
+  }
+
+  const row = btn.closest('tr');
+  const panel = document.createElement('tr');
+  panel.className = 'gen-panel-row';
+  panel.innerHTML = `
+    <td colspan="4" style="padding:6px 10px;background:var(--bg-input,#1a1a2e);">
+      <span style="font-size:0.78rem;color:var(--text-secondary);margin-right:6px;">Expand <strong style="color:var(--cyan)">${name}</strong> by</span>
+      <select class="gen-factor-select" style="font-size:0.78rem;padding:2px 4px;background:var(--bg-card);color:var(--text-primary);border:1px solid var(--border);border-radius:3px;">
+        ${[2,3,4,5,6,7,8,9,10].map(n=>`<option value="${n}">${n}x</option>`).join('')}
+      </select>
+      <button class="btn-gen-confirm" style="margin-left:6px;font-size:0.78rem;padding:2px 8px;background:var(--cyan);color:#000;border:none;border-radius:3px;cursor:pointer;">Generate</button>
+      <button class="btn-gen-cancel" style="margin-left:4px;font-size:0.78rem;padding:2px 8px;background:transparent;color:var(--text-muted);border:1px solid var(--border);border-radius:3px;cursor:pointer;">Cancel</button>
+      <span class="gen-status" style="margin-left:8px;font-size:0.76rem;color:var(--text-muted);"></span>
+    </td>`;
+
+  row.after(panel);
+
+  panel.querySelector('.btn-gen-cancel').addEventListener('click', () => panel.remove());
+  panel.querySelector('.btn-gen-confirm').addEventListener('click', async () => {
+    const factor = parseInt(panel.querySelector('.gen-factor-select').value);
+    const status = panel.querySelector('.gen-status');
+    status.textContent = 'Generating…';
+    try {
+      const resp = await fetch('/files/generate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name, factor}),
+      });
+      const result = await resp.json();
+      if (!resp.ok) {
+        status.style.color = 'var(--red)';
+        status.textContent = result.error || 'Error';
+        return;
+      }
+      panel.remove();
+      await refreshFileTable(result.name);
+    } catch (e) {
+      status.style.color = 'var(--red)';
+      status.textContent = 'Network error';
+    }
+  });
+}
+
+async function refreshFileTable(autoSelectName) {
+  try {
+    const resp = await fetch('/files/list');
+    const files = await resp.json();
+    const tbody = document.querySelector('.file-table tbody');
+    if (!tbody) return;
+    tbody.innerHTML = files.map(f => {
+      const canGen = /^\d-\d+(k|m|b)\.txt$/.test(f.name);
+      const genDisabled = !FILE_GENERATE_ENABLED || !canGen;
+      return `<tr data-filename="${f.name}">
+        <td><span class="file-name">${f.name}</span></td>
+        <td><span class="file-size">${f.size_display}</span></td>
+        <td><button class="btn-use" type="button" data-filename="${f.name}">Use</button></td>
+        <td><button class="btn-gen${genDisabled ? ' btn-gen-disabled' : ''}"
+                    type="button" data-filename="${f.name}"
+                    ${genDisabled ? 'disabled' : ''}>Generate</button></td>
+      </tr>`;
+    }).join('');
+    initFileBrowser();
+    initFileGenerate();
+    if (autoSelectName) loadFile(autoSelectName);
+  } catch (e) {
+    console.error('refreshFileTable failed:', e);
+  }
+}
+
+/* ============================================================
    COLLAPSIBLE SECTIONS
    ============================================================ */
 function initCollapsibles() {
@@ -418,14 +504,15 @@ function initCollapsibles() {
 const INPUT_DISPLAY_CAP = 10_000; // max chars shown in the number textarea (disk mode)
 const RESULT_WINDOW     = 10_000; // chars per Prev/Next navigation window
 
-let _resultFull       = '';  // content of the currently-displayed result window
-let _resultLength     = 0;   // chars in the current window
-let _resultTotalChars = 0;   // true total chars in the full result (from server)
-let _windowOffset     = 0;   // absolute start position of current window in full result
-let _navOffset        = 0;   // legacy alias — equals _windowOffset
-let _currentPage      = 1;   // 1-based page number of current window
-let _totalPages       = 0;   // total pages = ceil(_resultTotalChars / RESULT_WINDOW)
-let _displayMode      = 'pyramid';  // 'standard' | 'pyramid'
+let _resultFull        = '';  // content of the currently-displayed result window
+let _resultLength      = 0;   // chars in the current window
+let _resultTotalChars  = 0;   // true total chars in the full result (from server)
+let _windowOffset      = 0;   // absolute start position of current window in full result
+let _navOffset         = 0;   // legacy alias — equals _windowOffset
+let _currentPage       = 1;   // 1-based page number of current window
+let _totalPages        = 0;   // total pages = ceil(_resultTotalChars / RESULT_WINDOW)
+let _displayMode       = 'pyramid';  // 'standard' | 'pyramid'
+let _lastResultOperation = '';  // operation used for the last calculation — passed to /calc/window
 
 let _highlightHpl = true;  // HPL pattern highlight toggle
 let _highlightHpr = true;  // HPR pattern highlight toggle
@@ -892,7 +979,7 @@ async function loadWindow(offset) {
   if (_resultTotalChars > 0 && offset >= _resultTotalChars) return;
 
   try {
-    const resp = await fetch(`/calc/window?offset=${offset}&length=${RESULT_WINDOW}`);
+    const resp = await fetch(`/calc/window?offset=${offset}&length=${RESULT_WINDOW}&operation=${encodeURIComponent(_lastResultOperation)}`);
     if (!resp.ok) return;
     const data = await resp.json();
 
@@ -928,6 +1015,8 @@ async function loadWindow(offset) {
 function onResultSwap() {
   const fullEl = document.getElementById('result-full');
   if (!fullEl) return;
+
+  _lastResultOperation = document.getElementById('operation')?.value || '';
 
   // Seed state from the server-rendered first window (up to 10 000 chars).
   _resultFull   = fullEl.textContent;
@@ -969,10 +1058,21 @@ function onResultSwap() {
 /* ============================================================
    HTMX EVENT HOOKS
    ============================================================ */
+function colorizeResultPatterns() {
+  document.querySelectorAll('.pattern-colorize').forEach(el => {
+    const pattern = el.dataset.pattern;
+    const digit = el.dataset.digit;
+    if (pattern && digit && typeof colorizePattern === 'function') {
+      el.innerHTML = colorizePattern(pattern, digit);
+    }
+  });
+}
+
 document.addEventListener('htmx:afterSwap', (e) => {
   // After result partial is swapped in, init nav and animate
   if (e.detail.target?.id === 'result-panel') {
     onResultSwap();
+    colorizeResultPatterns();
     const display = document.getElementById('number-display');
     if (display) {
       display.classList.add('htmx-added');
@@ -1097,6 +1197,7 @@ function initIncrementSteppers() {
 document.addEventListener('DOMContentLoaded', () => {
   initDigitSelector();
   initFileBrowser();
+  initFileGenerate();
   initCollapsibles();
   initResultNav();
   initCopyButton();
@@ -1118,5 +1219,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // and Prev/Next load out-of-range chunks, blanking the display.
   if (document.getElementById('result-full')) {
     onResultSwap();
+    colorizeResultPatterns();
   }
 });
