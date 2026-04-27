@@ -1063,7 +1063,7 @@ function colorizeResultPatterns() {
     const pattern = el.dataset.pattern;
     const digit = el.dataset.digit;
     if (pattern && digit && typeof colorizePattern === 'function') {
-      el.innerHTML = colorizePattern(pattern, digit);
+      el.innerHTML = colorizePattern(pattern, digit, el.dataset.end === 'true');
     }
   });
 }

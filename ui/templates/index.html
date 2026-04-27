@@ -448,28 +448,26 @@
   }
 
   // ── History pattern colorizer ───────────────────────────────────
-  function colorizePattern(text, digit) {
+  function colorizePattern(text, digit, isEnd = false) {
     if (!text || typeof MATRIX === 'undefined' || !MATRIX[digit]) return text || '—';
     const data = MATRIX[digit];
     const showHpl = document.getElementById('toggle-hpl')?.classList.contains('active');
     const showHpr = document.getElementById('toggle-hpr')?.classList.contains('active');
     const hpl = data.hpl || '', hpr = data.hpr || '';
     const hplLen = hpl.length, hprLen = hpr.length;
+    const len = text.length;
 
-    // Find VPC (first exact match of any vpc key)
-    let vpcStart = -1, vpcEnd = -1;
-    for (const key of Object.keys(data).filter(k => k.startsWith('vpc'))) {
-      const vpc = data[key];
-      if (!vpc || vpc === '—') continue;
-      const idx = text.indexOf(vpc);
-      if (idx !== -1) { vpcStart = idx; vpcEnd = idx + vpc.length; break; }
-    }
+    // Fixed midpoint split — left half is HPL territory, right half is HPR territory.
+    // Middle position (mid) is left as green by default; VPC may override it later.
+    // This avoids the old bug where a missing VPC caused all chars to be coloured HPR.
+    const mid        = Math.floor(len / 2);  // =15 for 30-char excerpts
+    const leftEnd    = mid - 1;              // last index of HPL zone  (0..14)
+    const rightStart = mid + 1;              // first index of HPR zone (16..29)
 
-    const colors = new Array(text.length).fill(null);
-    if (vpcStart !== -1) for (let i = vpcStart; i < vpcEnd; i++) colors[i] = 'vpc';
+    // All chars default to green; HPL/HPR/VPC will override below.
+    const colors = new Array(len).fill('dev');
 
-    // Try all tile offsets for a range; return offset with most char matches.
-    // Handles excerpts that start mid-tile (unknown alignment).
+    // Try all tile offsets for a zone; return offset with highest char-match count.
     function bestOffset(pattern, from, to) {
       let bestOff = 0, bestCount = -1;
       for (let off = 0; off < pattern.length; off++) {
@@ -481,36 +479,40 @@
       return bestOff;
     }
 
-    // HPL: left portion only — requires VPC to be found so we know which chars are left half.
-    // If no VPC in excerpt (e.g. end_pattern) skip HPL entirely to avoid false purple coloring.
-    const leftEnd = vpcStart !== -1 ? vpcStart : 0;
-    if (leftEnd > 0 && hplLen > 0) {
-      const off = bestOffset(hpl, 0, leftEnd);
-      for (let i = 0; i < leftEnd; i++) {
-        if (!colors[i])
-          colors[i] = (text[i] === hpl[(off + i) % hplLen]) ? (showHpl ? 'hpl' : 'dev') : 'dev';
+    // Step 1 — HPL in left zone (0..leftEnd) — skipped for END-PATTERN (pure HPR territory)
+    if (!isEnd && hplLen > 0 && leftEnd >= 0) {
+      const off = bestOffset(hpl, 0, leftEnd + 1);
+      for (let i = 0; i <= leftEnd; i++)
+        colors[i] = (text[i] === hpl[(off + i) % hplLen]) ? (showHpl ? 'hpl' : 'dev') : 'dev';
+    }
+
+    // Step 2 — HPR: right zone for MID-PATTERN; full range for END-PATTERN
+    const hprFrom = isEnd ? 0 : rightStart;
+    if (hprLen > 0 && hprFrom < len) {
+      const off = bestOffset(hpr, hprFrom, len);
+      for (let i = hprFrom; i < len; i++)
+        colors[i] = (text[i] === hpr[(off + i - hprFrom) % hprLen]) ? (showHpr ? 'hpr' : 'dev') : 'dev';
+    }
+
+    // Step 3 — VPC: try exact match anywhere in text; override HPL/HPR colours if found.
+    for (const key of Object.keys(data).filter(k => k.startsWith('vpc'))) {
+      const vpc = data[key];
+      if (!vpc || vpc === '—') continue;
+      const idx = text.indexOf(vpc);
+      if (idx !== -1) {
+        for (let i = idx; i < idx + vpc.length; i++) colors[i] = 'vpc';
+        break;
       }
     }
 
-    // HPR: right portion (after VPC if found, else whole text — end_pattern is pure right half)
-    const rightStart = vpcEnd !== -1 ? vpcEnd : 0;
-    if (rightStart < text.length && hprLen > 0) {
-      const off = bestOffset(hpr, rightStart, text.length);
-      for (let i = rightStart; i < text.length; i++) {
-        if (!colors[i])
-          colors[i] = (text[i] === hpr[(off + i - rightStart) % hprLen]) ? (showHpr ? 'hpr' : 'dev') : 'dev';
-      }
-    }
-
-    // CSS classes for matches; green inline style for deviations (history cells don't inherit
-    // var(--green) from .number-display the way the pyramid container does).
+    // Render — all positions now have an explicit colour; green inline style for deviations
+    // because history/result cells don't inherit var(--green) from .number-display.
     const CLASS_MAP = { vpc: 'vpc-highlight', hpr: 'hpr-match', hpl: 'hpl-match' };
     let html = '', i = 0;
-    while (i < text.length) {
+    while (i < len) {
       const c = colors[i];
-      if (!c) { html += text[i++]; continue; }
       let j = i;
-      while (j < text.length && colors[j] === c) j++;
+      while (j < len && colors[j] === c) j++;
       const chunk = text.slice(i, j);
       html += c === 'dev'
         ? `<span style="color:var(--green)">${chunk}</span>`
@@ -536,7 +538,7 @@
         <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--amber);">${r.elapsed.toFixed(4)}s</td>
         <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--amber);">${r.increment ?? 0}</td>
         <td style="font-family:var(--font-mono);font-size:0.65rem;white-space:nowrap;">${r.mid_pattern ? colorizePattern(r.mid_pattern, r.repdigit) : '—'}</td>
-        <td style="font-family:var(--font-mono);font-size:0.65rem;white-space:nowrap;">${r.end_pattern ? colorizePattern(r.end_pattern, r.repdigit) : '—'}</td>
+        <td style="font-family:var(--font-mono);font-size:0.65rem;white-space:nowrap;">${r.end_pattern ? colorizePattern(r.end_pattern, r.repdigit, true) : '—'}</td>
       </tr>`).join('');
     wrap.innerHTML = `
       <div style="overflow-x:auto">
