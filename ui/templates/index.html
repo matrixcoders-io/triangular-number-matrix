@@ -494,8 +494,10 @@
         colors[i] = (text[i] === hpr[(off + i - hprFrom) % hprLen]) ? (showHpr ? 'hpr' : 'dev') : 'dev';
     }
 
-    // Step 3 — VPC: try exact match anywhere in text; override HPL/HPR colours if found.
-    for (const key of Object.keys(data).filter(k => k.startsWith('vpc'))) {
+    // Step 3 — VPC: only for MID-PATTERN (excerpt centred on TN midpoint).
+    // END-PATTERN is the tail of the TN — the constant never appears there; any match is a
+    // coincidental substring, so skip VPC search entirely when isEnd is true.
+    if (!isEnd) for (const key of Object.keys(data).filter(k => k.startsWith('vpc'))) {
       const vpc = data[key];
       if (!vpc || vpc === '—') continue;
       const idx = text.indexOf(vpc);

@@ -129,9 +129,17 @@ function detectConstantsFromResult(text, hintDigit = null) {
         searchFrom = idx + 1;
       }
     }
-    for (const key of vpcKeys) {
-      const vpc = data[key];
-      if (vpc && vpc !== '—' && text.includes(vpc)) return { digit: hintDigit, vpcKey: key };
+    {
+      const mid = Math.floor(text.length / 2);
+      for (const key of vpcKeys) {
+        const vpc = data[key];
+        if (!vpc || vpc === '—') continue;
+        const idx = text.indexOf(vpc);
+        if (idx === -1) continue;
+        if (Math.abs(idx + Math.floor(vpc.length / 2) - mid) <= hplLen * 2) {
+          return { digit: hintDigit, vpcKey: key };
+        }
+      }
     }
     return { digit: hintDigit, vpcKey: null };
   }
@@ -561,16 +569,24 @@ function renderWindowContent(text) {
   const vpcVal = vpcEl ? vpcEl.textContent.trim() : '';
 
   if (vpcVal && vpcVal !== '—' && text.includes(vpcVal)) {
-    const idx    = text.indexOf(vpcVal);
-    const before = text.slice(0, idx);
-    const after  = text.slice(idx + vpcVal.length);
-    display.innerHTML =
-      before +
-      `<span class="vpc-highlight">${vpcVal}</span>` +
-      after;
-  } else {
-    display.textContent = text;
+    const idx = text.indexOf(vpcVal);
+    // Reject coincidental VPC matches far from the TN centre (e.g. a VPC value that
+    // happens to appear at the end of the result due to an increment).
+    const absCenter = _windowOffset + idx + Math.floor(vpcVal.length / 2);
+    const tnCenter  = Math.floor(_resultTotalChars / 2);
+    const threshold = Math.max(50, Math.floor(_resultTotalChars * 0.005));
+    if (Math.abs(absCenter - tnCenter) <= threshold) {
+      const before = text.slice(0, idx);
+      const after  = text.slice(idx + vpcVal.length);
+      display.innerHTML =
+        before +
+        `<span class="vpc-highlight">${vpcVal}</span>` +
+        after;
+      display.scrollTop = 0;
+      return;
+    }
   }
+  display.textContent = text;
   display.scrollTop = 0;
 }
 
@@ -610,6 +626,18 @@ function colorizeStr(str, expected, cssClass) {
     }
   }
   return html;
+}
+
+/** Find best tile offset for a short string — used to colorize the pyramid apex area. */
+function apexBestOffset(pattern, text) {
+  let bestOff = 0, bestCount = -1;
+  for (let off = 0; off < pattern.length; off++) {
+    let count = 0;
+    for (let i = 0; i < text.length; i++)
+      if (text[i] === pattern[(off + i) % pattern.length]) count++;
+    if (count > bestCount) { bestCount = count; bestOff = off; }
+  }
+  return bestOff;
 }
 
 /**
@@ -680,12 +708,11 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   }
 
   if (vpcIdx === -1) {
-    // No exact match near centre — snap midpoint to the nearest HPL tile boundary so that
-    // leftTilesPart.length % hplLen === 0, guaranteeing colorizeStr(tile, hpl) compares at
-    // offset 0 (not mid-tile) and finds correct matches instead of rendering everything green.
-    const rawMid = Math.floor((text.length - vpcVal.length) / 2);
-    const modOff = ((rawMid - lcLen) % hplLen + hplLen) % hplLen;
-    vpcIdx    = modOff <= Math.floor(hplLen / 2) ? rawMid - modOff : rawMid + (hplLen - modOff);
+    // No exact match near centre — use the same midpoint formula as the Python backend
+    // (_mid = len // 2, vpcStart = _mid - vpcLen // 2) so the pyramid apex aligns with
+    // MID-PATTERN. leftFull tiles start from lcLen (unchanged for small increments) and
+    // compare correctly against hpl with colorizeStr regardless of leftRemLen.
+    vpcIdx    = Math.floor(text.length / 2) - Math.floor(vpcVal.length / 2);
     activeVpc = text.slice(vpcIdx, vpcIdx + vpcVal.length);
     vpcWildPos = -1;
   }
@@ -752,16 +779,40 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
 
   const lines = [];
 
-  // Apex row: leftRem + VPC (red) + rightRem — the partial patterns adjacent to the constant.
+  // Apex row: leftRem + VPC/centre + rightRem.
   {
-    const apexLeft  = (leftRemLen  > 0 && highlightHpl) ? colorLeftRem()  : leftRemStr;
-    const apexRight = (rightRemLen > 0 && highlightHpr) ? colorRightRem() : rightRemStr;
-    lines.push(
-      ' '.repeat(cap * hplLen) +
-      apexLeft +
-      vpcApexHtml(activeVpc, vpcWildPos) +
-      apexRight
-    );
+    if (vpcWildPos === null) {
+      // Exact VPC match — existing path: HPL leftRem, red VPC, HPR rightRem.
+      const apexLeft  = (leftRemLen  > 0 && highlightHpl) ? colorLeftRem()  : leftRemStr;
+      const apexRight = (rightRemLen > 0 && highlightHpr) ? colorRightRem() : rightRemStr;
+      lines.push(' '.repeat(cap * hplLen) + apexLeft + vpcApexHtml(activeVpc, null) + apexRight);
+    } else {
+      // No VPC match — extend HPL/HPR through the VPC space using bestOffset.
+      // The exact centre char (index leftRemLen + floor(vpcLen/2)) stays plain green.
+      // This mirrors colorizePattern's Step 1/2 algorithm for the apex area.
+      const apexStr  = leftRemStr + activeVpc + rightRemStr;
+      const center   = leftRemLen + Math.floor(vpcLen / 2);
+
+      const leftApex = apexStr.slice(0, center);
+      const hplOff   = apexBestOffset(hpl, leftApex);
+      let leftHtml = '';
+      for (let i = 0; i < leftApex.length; i++) {
+        const match = highlightHpl && leftApex[i] === hpl[(hplOff + i) % hplLen];
+        leftHtml += match ? `<span class="hpl-match">${leftApex[i]}</span>` : leftApex[i];
+      }
+
+      const centerHtml = apexStr[center] ?? '';
+
+      const rightApex = apexStr.slice(center + 1);
+      const hprOff    = apexBestOffset(hpr, rightApex);
+      let rightHtml = '';
+      for (let i = 0; i < rightApex.length; i++) {
+        const match = highlightHpr && rightApex[i] === hpr[(hprOff + i) % hprLen];
+        rightHtml += match ? `<span class="hpr-match">${rightApex[i]}</span>` : rightApex[i];
+      }
+
+      lines.push(' '.repeat(cap * hplLen) + leftHtml + centerHtml + rightHtml);
+    }
   }
 
   // Body rows k=1..cap: k tiles on each side, growing wider per row.
