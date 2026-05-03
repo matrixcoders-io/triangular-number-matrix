@@ -784,7 +784,8 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   const colorLeftRem  = () => colorizeStr(leftRemStr,  tileHpl.slice(0, leftRemLen), 'hpl-match');
   const colorRightRem = () => colorizeStr(
     rightRemStr,
-    (rightFull.length > 1 ? rightFull[0] : tileHpr).slice(tileHprLen - rightRemLen),
+    (hprLen < TARGET_TILE_WIDTH ? tileHpr : (rightFull.length > 1 ? rightFull[0] : tileHpr))
+      .slice(tileHprLen - rightRemLen),
     'hpr-match'
   );
 
@@ -842,6 +843,11 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   //   Upper rows: tiles match baseline → all amber.
   //   Bottom row: inner tiles match → amber; changed end tiles differ → green.
   const rightBaseline = rightFull[M - cap];
+  // For short patterns (digits 3, 6, 9), compare right tiles against fixed tileHpr so that
+  // incremented chars always show green. rightBaseline is derived from content and absorbs
+  // changes when a large increment modifies many tiles, producing false amber matches.
+  // For 9-char pattern digits, rightBaseline handles hpr rotations correctly — keep as-is.
+  const rightExpected = hprLen < TARGET_TILE_WIDTH ? tileHpr : rightBaseline;
 
   for (let k = 1; k <= cap; k++) {
     let leftContent = '';
@@ -856,7 +862,7 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
     let rightContent = '';
     if (highlightHpr) {
       for (let i = rStart; i < rStart + k; i++)
-        rightContent += colorizeStr(rightFull[i], rightBaseline, 'hpr-match');
+        rightContent += colorizeStr(rightFull[i], rightExpected, 'hpr-match');
     } else {
       for (let i = rStart; i < rStart + k; i++) rightContent += rightFull[i];
     }
