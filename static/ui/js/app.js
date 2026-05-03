@@ -689,9 +689,9 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
 
   // Look up lc prefix length for this digit family (digits 5, 7, 9 have a 1-char lc prefix).
   // leftFull tiles start after the lc prefix.
-  let lcLen = 0;
+  let lcLen = 0, lcStr = '';
   for (const data of Object.values(MATRIX)) {
-    if (data.hpl === hpl) { lcLen = data.lc ? data.lc.length : 0; break; }
+    if (data.hpl === hpl) { lcLen = data.lc ? data.lc.length : 0; lcStr = data.lc || ''; break; }
   }
 
   // Find vpcIdx with tile-alignment verification (rejects coincidental matches in changed zones).
@@ -762,7 +762,7 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   // leftPad = gapCol - (k*hplLen + leftRemLen) = (cap-k)*hplLen  (purely arithmetic).
   const cap    = Math.min(N, M, MAX_PYRAMID_ROWS);
   if (cap === 0) return null;
-  const gapCol = cap * hplLen + leftRemLen;  // column where VPC starts
+  const gapCol = lcLen + cap * hplLen + leftRemLen;  // column where VPC starts
 
   // Colorize helpers for the partial rem slots:
   //   leftRem aligns to hpl HEAD  (hpl[0:leftRemLen])
@@ -785,7 +785,7 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
       // Exact VPC match — existing path: HPL leftRem, red VPC, HPR rightRem.
       const apexLeft  = (leftRemLen  > 0 && highlightHpl) ? colorLeftRem()  : leftRemStr;
       const apexRight = (rightRemLen > 0 && highlightHpr) ? colorRightRem() : rightRemStr;
-      lines.push(' '.repeat(cap * hplLen) + apexLeft + vpcApexHtml(activeVpc, null) + apexRight);
+      lines.push(' '.repeat(lcLen + cap * hplLen) + apexLeft + vpcApexHtml(activeVpc, null) + apexRight);
     } else {
       // No VPC match — extend HPL/HPR through the VPC space using bestOffset.
       // The exact centre char (index leftRemLen + floor(vpcLen/2)) stays plain green.
@@ -811,7 +811,7 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
         rightHtml += match ? `<span class="hpr-match">${rightApex[i]}</span>` : rightApex[i];
       }
 
-      lines.push(' '.repeat(cap * hplLen) + leftHtml + centerHtml + rightHtml);
+      lines.push(' '.repeat(lcLen + cap * hplLen) + leftHtml + centerHtml + rightHtml);
     }
   }
 
@@ -851,9 +851,14 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
     }
 
     // leftPad: text length of leftContent = k*hplLen (no partial).
-    // gapCol = cap*hplLen + leftRemLen → leftPad = (cap-k)*hplLen + leftRemLen.
-    const leftPad = ' '.repeat((cap - k) * hplLen + leftRemLen);
-    lines.push(leftPad + leftContent + ' '.repeat(vpcLen) + rightContent);
+    // gapCol = lcLen + cap*hplLen + leftRemLen → leftPad = lcLen + (cap-k)*hplLen + leftRemLen.
+    // Bottom row (k=cap): lc prefix rendered as plain green text before tiles; leftPad = leftRemLen.
+    // Upper rows (k<cap): lcLen extra leading spaces maintain VPC column alignment.
+    const leftPad = (k === cap && lcLen > 0)
+      ? ' '.repeat(leftRemLen)
+      : ' '.repeat(lcLen + (cap - k) * hplLen + leftRemLen);
+    const lcPrefix = (k === cap) ? lcStr : '';
+    lines.push(leftPad + lcPrefix + leftContent + ' '.repeat(vpcLen) + rightContent);
   }
 
   return { html: lines.join('\n'), gapCol };
