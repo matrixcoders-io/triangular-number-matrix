@@ -687,6 +687,17 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   const hplLen = hpl.length;
   const hprLen = hpr.length;
 
+  // Digits 3, 6, 9 have 1-char HPL/HPR patterns. Expand to 9-char virtual tiles so the
+  // pyramid shows the same per-row character count as 9-char-pattern digits (1,2,4,5,7,8).
+  // For digits where hplLen=9 already, tileHpl === hpl — no change to any computation.
+  const TARGET_TILE_WIDTH = 9;
+  const tileHpl    = hplLen < TARGET_TILE_WIDTH
+    ? hpl.repeat(TARGET_TILE_WIDTH).slice(0, TARGET_TILE_WIDTH) : hpl;
+  const tileHpr    = hprLen < TARGET_TILE_WIDTH
+    ? hpr.repeat(TARGET_TILE_WIDTH).slice(0, TARGET_TILE_WIDTH) : hpr;
+  const tileHplLen = tileHpl.length;
+  const tileHprLen = tileHpr.length;
+
   // Look up lc prefix length for this digit family (digits 5, 7, 9 have a 1-char lc prefix).
   // leftFull tiles start after the lc prefix.
   let lcLen = 0, lcStr = '';
@@ -704,7 +715,7 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   if (vpcIdx !== -1) {
     const mid       = Math.floor(text.length / 2);
     const vpcCenter = vpcIdx + Math.floor(vpcVal.length / 2);
-    if (Math.abs(vpcCenter - mid) > hplLen * 2) vpcIdx = -1;
+    if (Math.abs(vpcCenter - mid) > tileHplLen * 2) vpcIdx = -1;
   }
 
   if (vpcIdx === -1) {
@@ -724,28 +735,28 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   // Python build_left tiles L→R: full tiles then hpl[0:rem] at the end.
   // So leftRemStr = head of hpl (first leftRemLen chars).
   const leftTilesPart = leftPart.slice(lcLen);
-  const leftRemLen    = leftTilesPart.length % hplLen;
+  const leftRemLen    = leftTilesPart.length % tileHplLen;
   const leftRemStr    = leftRemLen > 0 ? leftTilesPart.slice(-leftRemLen) : '';
   const leftFullStr   = leftRemLen > 0 ? leftTilesPart.slice(0, -leftRemLen) : leftTilesPart;
   const leftFull      = [];
-  for (let i = 0; i < leftFullStr.length; i += hplLen)
-    leftFull.push(leftFullStr.slice(i, i + hplLen));
+  for (let i = 0; i < leftFullStr.length; i += tileHplLen)
+    leftFull.push(leftFullStr.slice(i, i + tileHplLen));
 
   // Right: use natural tile boundaries (modular rem).
   // For pure repdigit: rem = tail-of-hpr prefix length; full tiles = hpr exactly.
   // For increment: rem = same formula; full tiles = a fixed rotation of hpr (all equal).
   // Natural boundaries ensure Pyramid content matches Standard mode char-for-char.
-  const rightRemLen  = rightPart.length % hprLen;
+  const rightRemLen  = rightPart.length % tileHprLen;
   const rightRemStr  = rightRemLen > 0 ? rightPart.slice(0, rightRemLen) : '';
   const rightFullStr = rightRemLen > 0 ? rightPart.slice(rightRemLen) : rightPart;
   const rightFull    = [];
-  for (let i = 0; i + hprLen <= rightFullStr.length; i += hprLen)
-    rightFull.push(rightFullStr.slice(i, i + hprLen));
-  // Always override last tile with the true last hprLen chars of the result.
+  for (let i = 0; i + tileHprLen <= rightFullStr.length; i += tileHprLen)
+    rightFull.push(rightFullStr.slice(i, i + tileHprLen));
+  // Always override last tile with the true last tileHprLen chars of the result.
   // Inner tiles repeat the same rotation; the last tile carries the actual final digit
   // which may differ after any increment.
   if (rightFull.length > 0)
-    rightFull[rightFull.length - 1] = rightPart.slice(-hprLen);
+    rightFull[rightFull.length - 1] = rightPart.slice(-tileHprLen);
 
   const N      = leftFull.length;
   const M      = rightFull.length;
@@ -758,11 +769,11 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
     ' rightFull[M-1]=' + JSON.stringify(rightFull[M - 1]));
 
   // cap = max rows to show. gapCol = column where VPC starts in every row.
-  // Row k text widths: left = k*hplLen + leftRemLen, right = rightRemLen + k*hprLen.
-  // leftPad = gapCol - (k*hplLen + leftRemLen) = (cap-k)*hplLen  (purely arithmetic).
+  // Row k text widths: left = k*tileHplLen + leftRemLen, right = rightRemLen + k*tileHprLen.
+  // leftPad = gapCol - (k*tileHplLen + leftRemLen) = (cap-k)*tileHplLen  (purely arithmetic).
   const cap    = Math.min(N, M, MAX_PYRAMID_ROWS);
   if (cap === 0) return null;
-  const gapCol = lcLen + cap * hplLen + leftRemLen;  // column where VPC starts
+  const gapCol = lcLen + cap * tileHplLen + leftRemLen;  // column where VPC starts
 
   // Colorize helpers for the partial rem slots:
   //   leftRem aligns to hpl HEAD  (hpl[0:leftRemLen])
@@ -770,10 +781,10 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   //     For pure repdigit: rightFull[0] = hpr, so this equals hpr[-rightRemLen:] (same as before).
   //     For increment: rightFull[0] is a rotation of hpr; using its tail gives the correct
   //     expected value for the partial slot, so only genuinely changed chars show as green.
-  const colorLeftRem  = () => colorizeStr(leftRemStr,  hpl.slice(0, leftRemLen), 'hpl-match');
+  const colorLeftRem  = () => colorizeStr(leftRemStr,  tileHpl.slice(0, leftRemLen), 'hpl-match');
   const colorRightRem = () => colorizeStr(
     rightRemStr,
-    (rightFull.length > 1 ? rightFull[0] : hpr).slice(hprLen - rightRemLen),
+    (rightFull.length > 1 ? rightFull[0] : tileHpr).slice(tileHprLen - rightRemLen),
     'hpr-match'
   );
 
@@ -785,7 +796,7 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
       // Exact VPC match — existing path: HPL leftRem, red VPC, HPR rightRem.
       const apexLeft  = (leftRemLen  > 0 && highlightHpl) ? colorLeftRem()  : leftRemStr;
       const apexRight = (rightRemLen > 0 && highlightHpr) ? colorRightRem() : rightRemStr;
-      lines.push(' '.repeat(lcLen + cap * hplLen) + apexLeft + vpcApexHtml(activeVpc, null) + apexRight);
+      lines.push(' '.repeat(lcLen + cap * tileHplLen) + apexLeft + vpcApexHtml(activeVpc, null) + apexRight);
     } else {
       // No VPC match — extend HPL/HPR through the VPC space using bestOffset.
       // The exact centre char (index leftRemLen + floor(vpcLen/2)) stays plain green.
@@ -811,7 +822,7 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
         rightHtml += match ? `<span class="hpr-match">${rightApex[i]}</span>` : rightApex[i];
       }
 
-      lines.push(' '.repeat(lcLen + cap * hplLen) + leftHtml + centerHtml + rightHtml);
+      lines.push(' '.repeat(lcLen + cap * tileHplLen) + leftHtml + centerHtml + rightHtml);
     }
   }
 
@@ -836,7 +847,7 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
     let leftContent = '';
     if (highlightHpl) {
       for (let i = 0; i < k; i++)
-        leftContent += colorizeStr(leftFull[i], hpl, 'hpl-match');
+        leftContent += colorizeStr(leftFull[i], tileHpl, 'hpl-match');
     } else {
       for (let i = 0; i < k; i++) leftContent += leftFull[i];
     }
@@ -850,13 +861,13 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
       for (let i = rStart; i < rStart + k; i++) rightContent += rightFull[i];
     }
 
-    // leftPad: text length of leftContent = k*hplLen (no partial).
-    // gapCol = lcLen + cap*hplLen + leftRemLen → leftPad = lcLen + (cap-k)*hplLen + leftRemLen.
+    // leftPad: text length of leftContent = k*tileHplLen (no partial).
+    // gapCol = lcLen + cap*tileHplLen + leftRemLen → leftPad = lcLen + (cap-k)*tileHplLen + leftRemLen.
     // Bottom row (k=cap): lc prefix rendered as plain green text before tiles; leftPad = leftRemLen.
     // Upper rows (k<cap): lcLen extra leading spaces maintain VPC column alignment.
     const leftPad = (k === cap && lcLen > 0)
       ? ' '.repeat(leftRemLen)
-      : ' '.repeat(lcLen + (cap - k) * hplLen + leftRemLen);
+      : ' '.repeat(lcLen + (cap - k) * tileHplLen + leftRemLen);
     const lcPrefix = (k === cap) ? lcStr : '';
     lines.push(leftPad + lcPrefix + leftContent + ' '.repeat(vpcLen) + rightContent);
   }
