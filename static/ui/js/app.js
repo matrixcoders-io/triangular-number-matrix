@@ -878,7 +878,23 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
     lines.push(leftPad + lcPrefix + leftContent + ' '.repeat(vpcLen) + rightContent);
   }
 
-  return { html: lines.join('\n'), gapCol };
+  // Integrity check: compare pyramid's assembled TN start against text.
+  // lcStr is the only non-text-derived value; a mismatch means the pyramid shows
+  // a wrong character (e.g. lc digit stale after an increment carry).
+  const mismatches = [];
+  const pyramidLeft = lcStr + leftFull.slice(0, cap).join('');
+  const expectedLeft = text.slice(0, lcLen + cap * tileHplLen);
+  for (let i = 0; i < pyramidLeft.length; i++) {
+    if (pyramidLeft[i] !== expectedLeft[i]) {
+      mismatches.push(
+        'pos ' + i + ': pyramid shows \'' + pyramidLeft[i] +
+        '\', TN has \'' + expectedLeft[i] + '\''
+      );
+      break;
+    }
+  }
+
+  return { html: lines.join('\n'), gapCol, mismatches };
 }
 
 /** Render the current result window as a pyramid into #number-display. */
@@ -937,7 +953,7 @@ function renderPyramid() {
     return;
   }
 
-  const { html: pyramid, gapCol } = result;
+  const { html: pyramid, gapCol, mismatches } = result;
   display.classList.add('pyramid-mode');
   // Set overflow on the container div; whitespace preservation is handled by the
   // inner <pre class="pyramid-inner"> which uses the browser UA stylesheet's
@@ -947,7 +963,12 @@ function renderPyramid() {
   display.style.overflowWrap = '';
   display.style.overflowX = 'auto';
   display.style.overflowY = 'auto';
-  display.innerHTML = '<pre class="pyramid-inner">' + pyramid + '</pre>';
+  const mismatchBanner = mismatches.length > 0
+    ? '<div class="error-box" style="margin:0 0 8px 0;flex-shrink:0;">&#9888; Pyramid &ne; Standard view &mdash; '
+      + mismatches.map(m => m.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/'/g, '&#39;')).join('; ')
+      + '</div>'
+    : '';
+  display.innerHTML = mismatchBanner + '<pre class="pyramid-inner">' + pyramid + '</pre>';
   display.scrollTop = 0;
 
   // Auto-scroll horizontally to center the VPC column in the viewport
