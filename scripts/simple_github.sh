@@ -52,14 +52,33 @@ server {
     listen 80;
     server_name ${DOMAIN};
 
-    location / {
-        proxy_pass         http://127.0.0.1:${FLASK_PORT};
-        proxy_set_header   Host              \$host;
-        proxy_set_header   X-Real-IP         \$remote_addr;
-        proxy_set_header   X-Forwarded-For   \$proxy_add_x_forwarded_for;
-        proxy_set_header   X-Forwarded-Proto \$scheme;
-        proxy_read_timeout 300;
-        proxy_buffering    off;
+    # Redirect bare root to calculator (until a homepage is built)
+    location = / {
+        return 302 /tnm-calculator/;
+    }
+
+    # Strip /tnm-calculator prefix, proxy to Flask, rewrite HTML paths back
+    location /tnm-calculator/ {
+        proxy_pass          http://127.0.0.1:${FLASK_PORT}/;
+        proxy_set_header    Host              \$host;
+        proxy_set_header    X-Real-IP         \$remote_addr;
+        proxy_set_header    X-Forwarded-For   \$proxy_add_x_forwarded_for;
+        proxy_set_header    X-Forwarded-Proto \$scheme;
+        proxy_read_timeout  300;
+        proxy_buffering     off;
+
+        # Disable compression so sub_filter can rewrite response bodies
+        proxy_set_header    Accept-Encoding   "";
+
+        # Rewrite absolute paths in HTML responses so the browser stays under /tnm-calculator/
+        sub_filter_once  off;
+        sub_filter_types text/html;
+        sub_filter 'action="/'   'action="/tnm-calculator/';
+        sub_filter 'href="/'     'href="/tnm-calculator/';
+        sub_filter 'src="/'      'src="/tnm-calculator/';
+        sub_filter 'hx-get="/'  'hx-get="/tnm-calculator/';
+        sub_filter 'hx-post="/' 'hx-post="/tnm-calculator/';
+        sub_filter 'hx-put="/'  'hx-put="/tnm-calculator/';
     }
 }
 NGINX

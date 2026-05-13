@@ -14,6 +14,9 @@
 
 'use strict';
 
+// Subpath prefix — auto-detected so local dev (/) and server (/tnm-calculator) both work.
+const BASE_PATH = window.location.pathname.startsWith('/tnm-calculator') ? '/tnm-calculator' : '';
+
 /* ============================================================
    MATRIX CONSTANTS DATA
    Source: core/calculator.py TriangulaNumberMatrix.matrix
@@ -347,7 +350,7 @@ async function loadFile(filename) {
   if (ta) ta.value = mode === 'disk' ? 'Loading preview…' : 'Loading…';
 
   try {
-    const resp = await fetch(`/files/preview?name=${encodeURIComponent(filename)}`);
+    const resp = await fetch(`${BASE_PATH}/files/preview?name=${encodeURIComponent(filename)}`);
     if (resp.ok) {
       const text         = await resp.text();
       const truncated    = resp.headers.get('X-Preview-Truncated') === 'true';
@@ -434,7 +437,7 @@ function openGenPanel(btn) {
     const status = panel.querySelector('.gen-status');
     status.textContent = 'Generating…';
     try {
-      const resp = await fetch('/files/generate', {
+      const resp = await fetch(BASE_PATH + '/files/generate', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({name, factor}),
@@ -456,7 +459,7 @@ function openGenPanel(btn) {
 
 async function refreshFileTable(autoSelectName) {
   try {
-    const resp = await fetch('/files/list');
+    const resp = await fetch(BASE_PATH + '/files/list');
     const files = await resp.json();
     const tbody = document.querySelector('.file-table tbody');
     if (!tbody) return;
@@ -1018,7 +1021,7 @@ async function loadWindow(offset) {
   if (_resultTotalChars > 0 && offset >= _resultTotalChars) return;
 
   try {
-    const resp = await fetch(`/calc/window?offset=${offset}&length=${RESULT_WINDOW}&operation=${encodeURIComponent(_lastResultOperation)}`);
+    const resp = await fetch(`${BASE_PATH}/calc/window?offset=${offset}&length=${RESULT_WINDOW}&operation=${encodeURIComponent(_lastResultOperation)}`);
     if (!resp.ok) return;
     const data = await resp.json();
 
