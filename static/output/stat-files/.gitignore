@@ -1,5 +1,3 @@
 *
 !.gitignore
-!leaderboard.json
-!run_history.json
 !*/
