@@ -27,8 +27,13 @@ echo "[2/5] Backing up current code..."
 N=1
 while [[ -d "$BACKUP_BASE/triangular-number-matrix-$N" ]]; do N=$((N+1)); done
 BACKUP_DIR="$BACKUP_BASE/triangular-number-matrix-$N"
-cp -r "$APP_DIR" "$BACKUP_DIR"
-echo "      backed up → $BACKUP_DIR"
+# Exclude server-generated output files — they're preserved through deploys anyway
+rsync -a \
+  --exclude='static/output/stat-files/' \
+  --exclude='static/output/tn-files/' \
+  --exclude='static/output/we-files/' \
+  "$APP_DIR/" "$BACKUP_DIR/"
+echo "      backed up → $BACKUP_DIR (code only, output files excluded)"
 echo "      existing backups:"
 ls -d "$BACKUP_BASE"/triangular-number-matrix-* 2>/dev/null | sort -V | sed 's/^/        /'
 
@@ -37,7 +42,10 @@ echo "[3/5] Pulling from GitHub..."
 cd "$APP_DIR"
 git fetch origin
 git status
+# Stash any local edits so they don't block the pull, then re-apply afterwards
+git stash --include-untracked 2>/dev/null || true
 git pull origin "$(git rev-parse --abbrev-ref HEAD)"
+git stash pop 2>/dev/null || true
 echo ""
 echo "      recent commits:"
 git log --oneline -5 | sed 's/^/        /'
@@ -75,5 +83,7 @@ echo "  rollback : systemctl stop $SERVICE"
 echo "             mv $APP_DIR ${APP_DIR}.broken"
 echo "             mv $BACKUP_DIR $APP_DIR"
 echo "             systemctl start $SERVICE"
+echo "  note     : stat-files/ tn-files/ we-files/ are NOT in backup"
+echo "             they live in the live dir and survive all deploys + rollbacks"
 echo "======================================================"
 echo ""
