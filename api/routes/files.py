@@ -5,17 +5,21 @@ File browser blueprint — file listing with size/digit-count, preview endpoint.
 """
 
 import os
+import re
 import logging
 
 from flask import Blueprint, request, jsonify, abort
 
-from config import NUMBERS_DIR, UI_HTTP_FILE_TRANSFER, UI_HTTP_FILE_MAX_DIGITS
+from config import NUMBERS_DIR, UI_HTTP_FILE_TRANSFER, UI_HTTP_FILE_MAX_DIGITS, UI_FILE_GENERATE_ENABLED
 
 logger = logging.getLogger(__name__)
 
 files_bp = Blueprint("files", __name__)
 
 PREVIEW_CAP = 10_000  # max digits returned to browser for textarea preview
+
+_GEN_PATTERN = re.compile(r'^(\d)-(\d+)(k|m|b)\.txt$')
+_UNIT_MAP = {'k': 1_000, 'm': 1_000_000, 'b': 1_000_000_000}
 
 
 def _count_digits(path: str) -> int:
@@ -75,7 +79,7 @@ def list_files():
     try:
         files = sorted(
             f for f in os.listdir(NUMBERS_DIR)
-            if os.path.isfile(os.path.join(NUMBERS_DIR, f))
+            if os.path.isfile(os.path.join(NUMBERS_DIR, f)) and not f.startswith('.')
         )
         return jsonify([_file_info(f) for f in files])
     except Exception as e:
@@ -117,3 +121,53 @@ def preview_file():
     except Exception as e:
         logger.error("files/preview failed for %s: %s", name, e)
         abort(500)
+
+
+@files_bp.route("/files/generate", methods=["POST"])
+def generate_file():
+    """Generate a new repdigit file by expanding a source file N times."""
+    if not UI_FILE_GENERATE_ENABLED:
+        return jsonify({"error": "File generation is disabled"}), 403
+
+    data = request.get_json(silent=True) or {}
+    name = data.get("name", "")
+    try:
+        factor = int(data.get("factor", 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid factor"}), 400
+
+    if not name or "/" in name or "\\" in name or ".." in name:
+        return jsonify({"error": "Invalid filename"}), 400
+    if factor < 1 or factor > 10:
+        return jsonify({"error": "Factor must be 1-10"}), 400
+
+    m = _GEN_PATTERN.match(name)
+    if not m:
+        return jsonify({"error": "Filename must match pattern: digit-Nunit.txt"}), 400
+
+    digit, num, unit = m.group(1), int(m.group(2)), m.group(3)
+    src_path = os.path.join(NUMBERS_DIR, name)
+    if not os.path.isfile(src_path):
+        return jsonify({"error": "Source file not found"}), 404
+
+    new_num = num * factor
+    new_name = f"{digit}-{new_num}{unit}.txt"
+    dest_path = os.path.join(NUMBERS_DIR, new_name)
+    total_digits = new_num * _UNIT_MAP[unit]
+
+    try:
+        CHUNK = 1024 * 1024  # 1 MB per write
+        with open(dest_path, "w", encoding="ascii") as f:
+            remaining = total_digits
+            while remaining > 0:
+                chunk = min(remaining, CHUNK)
+                f.write(digit * chunk)
+                remaining -= chunk
+        return jsonify({
+            "name": new_name,
+            "digits": total_digits,
+            "size_display": _human_size(total_digits),
+        })
+    except Exception as e:
+        logger.error("generate_file failed: %s", e)
+        return jsonify({"error": str(e)}), 500

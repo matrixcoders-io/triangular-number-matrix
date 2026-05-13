@@ -31,9 +31,8 @@
           <span>Input Number
             <span class="input-meta" id="input-char-count">
               {% if num1 %}{{ num1 | length | string }} characters{% endif %}
-            </span>
+            </span><span id="input-file-badge" class="input-file-badge">{% if default_file %}<span style="color:var(--text-secondary)"> · filename </span><span style="color:var(--green)">◫</span> <strong style="color:var(--text-primary);font-weight:600">{{ default_file }}</strong>{% endif %}</span>
           </span>
-          <span id="input-file-badge" class="input-file-badge">{% if default_file %}◫ {{ default_file }}{% endif %}</span>
         </div>
         <textarea
           class="number-textarea"
@@ -207,20 +206,26 @@
             <th>File</th>
             <th>Size</th>
             <th></th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
           {% for f in file_names %}
-          <tr{% if f.name == default_file %} class="selected"{% endif %}>
+          <tr{% if f.name == default_file %} class="selected"{% endif %} data-filename="{{ f.name }}">
             <td><span class="file-name">{{ f.name }}</span></td>
             <td><span class="file-size">{{ f.size_display }}</span></td>
             <td>
               <button class="btn-use{% if f.name == default_file %} active{% endif %}" type="button" data-filename="{{ f.name }}">Use</button>
             </td>
+            <td>
+              <button class="btn-gen{% if not ui_file_generate_enabled %} btn-gen-disabled{% endif %}"
+                      type="button" data-filename="{{ f.name }}"
+                      {% if not ui_file_generate_enabled %}disabled{% endif %}>Generate</button>
+            </td>
           </tr>
           {% else %}
           <tr>
-            <td colspan="3" style="color: var(--text-muted); font-size: 0.8rem; padding: 12px 10px;">
+            <td colspan="4" style="color: var(--text-muted); font-size: 0.8rem; padding: 12px 10px;">
               No files found in static/numbers/
             </td>
           </tr>
@@ -373,6 +378,8 @@
 
 {% block scripts_extra %}
 <script>
+  const FILE_GENERATE_ENABLED = {{ 'true' if ui_file_generate_enabled else 'false' }};
+
   // ── Sync the ui_file_mode radio into the form hidden field ──────
   // The calculator form uses #file-mode-hidden (not the radio directly,
   // since the radio is outside the form).
@@ -402,29 +409,119 @@
   });
 
   // ── Leaderboard renderer ─────────────────────────────────────────
+  function formatSize(chars) {
+    let n = chars;
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let i = 0;
+    while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
+    return i === 0 ? `${Math.round(n)} B` : `${n.toFixed(1)} ${units[i]}`;
+  }
+
   function renderLeaderboard(wrap, data) {
-    if (!data || typeof data !== 'object' || Object.keys(data).length === 0) {
+    if (!Array.isArray(data) || data.length === 0) {
       wrap.innerHTML = '<span style="color: var(--text-secondary); font-size: 0.82rem;">No leaderboard data yet. Run calculations to populate the leaderboard.</span>';
       return;
     }
-    // Sort by input length descending (highest input first)
-    const entries = Object.values(data).sort((a, b) => b.length - a.length);
-    const rows = entries.map(r => `
+    const rows = data.map(r => `
       <tr>
-        <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--cyan);">${r.method}</td>
-        <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--gold);">${r.repdigit}</td>
-        <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--text-secondary);">${Number(r.length).toLocaleString()}</td>
-        <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--green);">${Number(r.result_chars).toLocaleString()}</td>
-        <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--amber);">${r.elapsed.toFixed(4)}s</td>
-        <td style="color:var(--text-secondary);font-family:var(--font-mono);font-size:0.75rem;">${r.ts}</td>
+        <td style="font-family:var(--font-mono);font-size:0.75rem;color:var(--cyan);">${r.method}</td>
+        <td style="font-family:var(--font-mono);font-size:0.75rem;color:var(--gold);text-align:center;">${r.repdigit}</td>
+        <td style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-secondary);text-align:right;">${Number(r.length).toLocaleString()}</td>
+        <td style="font-family:var(--font-mono);font-size:0.75rem;color:var(--green);text-align:right;">${Number(r.result_chars).toLocaleString()}</td>
+        <td style="font-family:var(--font-mono);font-size:0.75rem;color:var(--amber);text-align:right;">${r.increment ?? 0}</td>
+        <td style="font-family:var(--font-mono);font-size:0.75rem;color:var(--green);text-align:right;">${formatSize(r.result_chars)}</td>
+        <td style="font-family:var(--font-mono);font-size:0.75rem;color:var(--amber);text-align:right;">${r.elapsed.toFixed(4)}s</td>
+        <td style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary);">${r.ts}</td>
       </tr>`).join('');
     wrap.innerHTML = `
-      <table class="file-table">
-        <thead><tr>
-          <th>Method</th><th>Digit Family</th><th>Highest Input</th><th>Output Length</th><th>Fastest Time</th><th>Recorded</th>
-        </tr></thead>
-        <tbody>${rows}</tbody>
-      </table>`;
+      <div style="overflow-x:auto">
+        <table class="file-table">
+          <thead><tr>
+            <th>Method</th><th>Digit</th><th style="text-align:right">Input Length</th>
+            <th style="text-align:right">Output Length</th><th style="text-align:right">Increment</th>
+            <th style="text-align:right">Output Size</th><th style="text-align:right">Fastest Time</th>
+            <th>Recorded</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }
+
+  // ── History pattern colorizer ───────────────────────────────────
+  function colorizePattern(text, digit, isEnd = false) {
+    if (!text || typeof MATRIX === 'undefined' || !MATRIX[digit]) return text || '—';
+    const data = MATRIX[digit];
+    const showHpl = document.getElementById('toggle-hpl')?.classList.contains('active');
+    const showHpr = document.getElementById('toggle-hpr')?.classList.contains('active');
+    const hpl = data.hpl || '', hpr = data.hpr || '';
+    const hplLen = hpl.length, hprLen = hpr.length;
+    const len = text.length;
+
+    // Fixed midpoint split — left half is HPL territory, right half is HPR territory.
+    // Middle position (mid) is left as green by default; VPC may override it later.
+    // This avoids the old bug where a missing VPC caused all chars to be coloured HPR.
+    const mid        = Math.floor(len / 2);  // =15 for 30-char excerpts
+    const leftEnd    = mid - 1;              // last index of HPL zone  (0..14)
+    const rightStart = mid + 1;              // first index of HPR zone (16..29)
+
+    // All chars default to green; HPL/HPR/VPC will override below.
+    const colors = new Array(len).fill('dev');
+
+    // Try all tile offsets for a zone; return offset with highest char-match count.
+    function bestOffset(pattern, from, to) {
+      let bestOff = 0, bestCount = -1;
+      for (let off = 0; off < pattern.length; off++) {
+        let count = 0;
+        for (let i = from; i < to; i++)
+          if (text[i] === pattern[(off + i - from) % pattern.length]) count++;
+        if (count > bestCount) { bestCount = count; bestOff = off; }
+      }
+      return bestOff;
+    }
+
+    // Step 1 — HPL in left zone (0..leftEnd) — skipped for END-PATTERN (pure HPR territory)
+    if (!isEnd && hplLen > 0 && leftEnd >= 0) {
+      const off = bestOffset(hpl, 0, leftEnd + 1);
+      for (let i = 0; i <= leftEnd; i++)
+        colors[i] = (text[i] === hpl[(off + i) % hplLen]) ? (showHpl ? 'hpl' : 'dev') : 'dev';
+    }
+
+    // Step 2 — HPR: right zone for MID-PATTERN; full range for END-PATTERN
+    const hprFrom = isEnd ? 0 : rightStart;
+    if (hprLen > 0 && hprFrom < len) {
+      const off = bestOffset(hpr, hprFrom, len);
+      for (let i = hprFrom; i < len; i++)
+        colors[i] = (text[i] === hpr[(off + i - hprFrom) % hprLen]) ? (showHpr ? 'hpr' : 'dev') : 'dev';
+    }
+
+    // Step 3 — VPC: only for MID-PATTERN (excerpt centred on TN midpoint).
+    // END-PATTERN is the tail of the TN — the constant never appears there; any match is a
+    // coincidental substring, so skip VPC search entirely when isEnd is true.
+    if (!isEnd) for (const key of Object.keys(data).filter(k => k.startsWith('vpc'))) {
+      const vpc = data[key];
+      if (!vpc || vpc === '—') continue;
+      const idx = text.indexOf(vpc);
+      if (idx !== -1) {
+        for (let i = idx; i < idx + vpc.length; i++) colors[i] = 'vpc';
+        break;
+      }
+    }
+
+    // Render — all positions now have an explicit colour; green inline style for deviations
+    // because history/result cells don't inherit var(--green) from .number-display.
+    const CLASS_MAP = { vpc: 'vpc-highlight', hpr: 'hpr-match', hpl: 'hpl-match' };
+    let html = '', i = 0;
+    while (i < len) {
+      const c = colors[i];
+      let j = i;
+      while (j < len && colors[j] === c) j++;
+      const chunk = text.slice(i, j);
+      html += c === 'dev'
+        ? `<span style="color:var(--green)">${chunk}</span>`
+        : `<span class="${CLASS_MAP[c]}">${chunk}</span>`;
+      i = j;
+    }
+    return html;
   }
 
   // ── History table renderer ──────────────────────────────────────
@@ -441,14 +538,20 @@
         <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--text-secondary);">${Number(r.length).toLocaleString()}</td>
         <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--green);">${Number(r.result_chars).toLocaleString()}</td>
         <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--amber);">${r.elapsed.toFixed(4)}s</td>
+        <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--amber);">${r.increment ?? 0}</td>
+        <td style="font-family:var(--font-mono);font-size:0.65rem;white-space:nowrap;">${r.mid_pattern ? colorizePattern(r.mid_pattern, r.repdigit) : '—'}</td>
+        <td style="font-family:var(--font-mono);font-size:0.65rem;white-space:nowrap;">${r.end_pattern ? colorizePattern(r.end_pattern, r.repdigit, true) : '—'}</td>
       </tr>`).join('');
     wrap.innerHTML = `
-      <table class="file-table">
-        <thead><tr>
-          <th>Time</th><th>Method</th><th>Digit Family</th><th>Input Number Length</th><th>Output Number Length</th><th>Elapsed</th>
-        </tr></thead>
-        <tbody>${rows}</tbody>
-      </table>`;
+      <div style="overflow-x:auto">
+        <table class="file-table">
+          <thead><tr>
+            <th>Time</th><th>Method</th><th>Digit Family</th><th>Input Length</th><th>Output Length</th>
+            <th>Elapsed</th><th>Increment</th><th>MID-PATTERN</th><th>END-PATTERN</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
   }
 
   // ── HTMX swap handlers ──────────────────────────────────────────

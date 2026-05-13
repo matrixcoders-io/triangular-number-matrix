@@ -36,3 +36,11 @@ UI_HTTP_FILE_TRANSFER = os.environ.get("UI_HTTP_FILE_TRANSFER", "true").lower() 
 # Files with more digits than this will force disk-direct mode automatically.
 # Override at startup: UI_HTTP_FILE_MAX_DIGITS=5000000
 UI_HTTP_FILE_MAX_DIGITS = int(os.environ.get("UI_HTTP_FILE_MAX_DIGITS", "10000000"))
+
+# Minimum input length (digit count) for a run to qualify for the leaderboard.
+# Override at startup: LEADERBOARD_MIN_INPUT=1000000000
+LEADERBOARD_MIN_INPUT = int(os.environ.get("LEADERBOARD_MIN_INPUT", "4000000000"))
+
+# Set UI_FILE_GENERATE_ENABLED=true at startup to enable the Generate button in File Library.
+# When enabled, ALL files in NUMBERS_DIR are accepted by the calculator (ALLOWED_FILES bypassed).
+UI_FILE_GENERATE_ENABLED = os.environ.get("UI_FILE_GENERATE_ENABLED", "true").lower() == "true"

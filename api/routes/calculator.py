@@ -25,12 +25,24 @@ from config import (
     UI_HTTP_FILE_TRANSFER,
     UI_HTTP_FILE_MAX_DIGITS,
     ALLOWED_FILES,
+    UI_FILE_GENERATE_ENABLED,
 )
 from api.routes.stats import _load_history, _save_history, _update_leaderboard
 
 logger = logging.getLogger(__name__)
 
 calculator_bp = Blueprint("calculator", __name__)
+
+# Maps each operation name to the file path where its TN result is written.
+# /calc/window reads from this map instead of a shared canonical file.
+_METHOD_FILE_MAP = {
+    "tri_matrix":            TN_OUT_FILE + ".tri_matrix_standard.txt",
+    "tri_matrix_stream":     TN_OUT_FILE + ".tri_matrix_stream.txt",
+    "tri_matrix_memory":     TN_OUT_FILE + ".tri_matrix_memory.txt",
+    "tri_matrix_random":     TN_OUT_FILE + ".tri_matrix_random.txt",
+    "tri_div_gmpy2_formula": TN_OUT_FILE + ".tri_div_gmpy2_formula.txt",
+    "tri_div_simpy_formula": TN_OUT_FILE + ".tri_div_simpy_formula.txt",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -159,12 +171,23 @@ def handle_big_number_math(request_type: str):
                 logger.info("rep digit calculation complete (sympy n(n+1)/2): %.6f s", time.perf_counter() - start_time)
                 b = TriangulaNumberMatrix("1")
                 result = b.increment_by_gmpy_count(num1, result, num2) if num2 not in (None, "", " ") else result
+                result = str(result)  # convert sympy Integer to str once — later str() calls are no-ops
+                write_to_file(TN_OUT_FILE + "." + operation + ".txt", result)
+                write_to_file(
+                    os.path.join(STAT_FILES_DIR, "stat-file.txt.tri_div_simpy_formula.txt"),
+                    "{repdigit: " + str(num1[0]) +
+                    ", repdigit_length: " + str(len(num1)) +
+                    ", generated_chars: " + str(len(result)) +
+                    ", file_load_time: " + str(file_load_time) +
+                    ", total_elapsed: " + str(time.perf_counter() - start_time) + "}"
+                )
 
             elif operation == "tri_div_gmpy2_formula":
                 a = ManualBigNumber(num1)
                 logger.info("loaded file for gmpy2 n(n+1)/2: %s s", file_load_time)
                 result = a.triangular_number_gmpy2_division(num1)
-                write_to_file(TN_OUT_FILE + "." + operation + ".txt", str(result))
+                result = str(result)  # convert gmpy2 mpz → str once; later str() calls are no-ops
+                write_to_file(TN_OUT_FILE + "." + operation + ".txt", result)
                 write_to_file(
                     os.path.join(STAT_FILES_DIR, "stat-file.txt.tri_div_pmpy2_formula.txt"),
                     "{repdigit: " + str(num1[0]) +
@@ -176,6 +199,7 @@ def handle_big_number_math(request_type: str):
                 logger.info("rep digit calculation complete (gmpy2 n(n+1)/2): %.6f s", time.perf_counter() - start_time)
                 b = TriangulaNumberMatrix("1")
                 result = b.increment_by_gmpy_count(num1, result, num2) if num2 not in (None, "", " ") else result
+                result = str(result)  # no-op if no increment (already str); converts mpz if increment applied
 
             elif operation == "tri_matrix":
                 b = TriangulaNumberMatrix("1")
@@ -263,6 +287,7 @@ def handle_big_number_math(request_type: str):
                 repdigit = num1[0] if num1 else ""
                 result_str = str(result)
                 history = _load_history()
+                _mid = len(result_str) // 2
                 history.append({
                     "ts":           time.strftime("%Y-%m-%dT%H:%M:%S"),
                     "method":       operation,
@@ -270,6 +295,9 @@ def handle_big_number_math(request_type: str):
                     "length":       len(num1),
                     "result_chars": len(result_str),
                     "elapsed":      round(elapsed, 6),
+                    "increment":    int(num2) if num2 and num2.lstrip('-').isdigit() else 0,
+                    "mid_pattern":  result_str[max(0, _mid - 15): _mid + 15],
+                    "end_pattern":  result_str[-30:],
                 })
                 try:
                     _save_history(history)
@@ -289,15 +317,13 @@ def handle_big_number_math(request_type: str):
     DISPLAY_CAP = 10_000
     result_str = str(result) if result is not None else None
 
-    # Write full result to canonical file so the /calc/window endpoint can serve
-    # arbitrary chunks for large-result navigation in the UI.
-    if result_str:
-        try:
-            write_to_file(TN_LAST_RESULT, result_str)
-        except Exception as we:
-            logger.warning("Could not write last result file: %s", we)
     result_total_chars = len(result_str) if result_str else 0
     result_preview = result_str[:DISPLAY_CAP] if result_str else None
+
+    _mid = len(result_str) // 2 if result_str else 0
+    tpl_mid_pattern = result_str[max(0, _mid - 15): _mid + 15] if result_str else ""
+    tpl_end_pattern = result_str[-30:] if result_str else ""
+    tpl_repdigit = num1[0] if (result_str and num1) else ""
 
     template_vars = dict(
         result=result_preview,
@@ -309,9 +335,13 @@ def handle_big_number_math(request_type: str):
         elapsed=elapsed,
         elapsed_display=elapsed,
         percent_change=percent_change,
+        mid_pattern=tpl_mid_pattern,
+        end_pattern=tpl_end_pattern,
+        repdigit=tpl_repdigit,
         file_names=file_names,
         ui_http_enabled=UI_HTTP_FILE_TRANSFER,
         ui_http_max_digits=UI_HTTP_FILE_MAX_DIGITS,
+        ui_file_generate_enabled=UI_FILE_GENERATE_ENABLED,
         default_file=None,
     )
 
@@ -345,6 +375,7 @@ def index():
             DISPLAY_CAP = 10_000
             result_total_chars = len(result_str)
             result_preview = result_str[:DISPLAY_CAP]
+            _mid = result_total_chars // 2
             file_names = list_number_files()
             return render_template("index.html",
                 result=result_preview,
@@ -356,9 +387,13 @@ def index():
                 elapsed_display=elapsed,
                 percent_change=0.0,
                 error=None,
+                mid_pattern=result_str[max(0, _mid - 15): _mid + 15],
+                end_pattern=result_str[-30:],
+                repdigit=num1[0] if num1 else "",
                 file_names=file_names,
                 ui_http_enabled=UI_HTTP_FILE_TRANSFER,
                 ui_http_max_digits=UI_HTTP_FILE_MAX_DIGITS,
+                ui_file_generate_enabled=UI_FILE_GENERATE_ENABLED,
                 default_file=default_filename,
             )
         except Exception as e:
@@ -393,10 +428,15 @@ def result_window():
     except (ValueError, TypeError):
         return jsonify({"error": "Invalid offset or length"}), 400
 
+    operation = request.args.get("operation", "").strip()
+    result_file = _METHOD_FILE_MAP.get(operation)
+    if not result_file:
+        return jsonify({"error": f"Unknown operation '{operation}' — run a calculation first"}), 404
+
     try:
         # Use seek/read so only the requested chunk is loaded — safe for files of any size.
         # The result file contains pure ASCII digits (0–9), so bytes == chars.
-        with open(TN_LAST_RESULT, "rb") as f:
+        with open(result_file, "rb") as f:
             f.seek(0, 2)          # seek to end
             total = f.tell()      # file size in bytes == total chars
             if offset >= total:

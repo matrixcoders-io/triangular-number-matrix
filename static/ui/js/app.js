@@ -14,6 +14,9 @@
 
 'use strict';
 
+// Subpath prefix — auto-detected so local dev (/) and server (/tnm-calculator) both work.
+const BASE_PATH = window.location.pathname.startsWith('/tnm-calculator') ? '/tnm-calculator' : '';
+
 /* ============================================================
    MATRIX CONSTANTS DATA
    Source: core/calculator.py TriangulaNumberMatrix.matrix
@@ -129,16 +132,17 @@ function detectConstantsFromResult(text, hintDigit = null) {
         searchFrom = idx + 1;
       }
     }
-    for (const key of vpcKeys) {
-      const vpc = data[key];
-      if (vpc && vpc !== '—' && text.includes(vpc)) return { digit: hintDigit, vpcKey: key };
-    }
-    // Fuzzy fallback: exact vpc not found (increment changed the constant).
-    // Try 2-of-3 fuzzy match from center outward for each vpc key.
-    for (const key of vpcKeys) {
-      const vpc = data[key];
-      if (!vpc || vpc === '—') continue;
-      if (findFuzzyVpcIdx(text, vpc, data.hpl)) return { digit: hintDigit, vpcKey: key };
+    {
+      const mid = Math.floor(text.length / 2);
+      for (const key of vpcKeys) {
+        const vpc = data[key];
+        if (!vpc || vpc === '—') continue;
+        const idx = text.indexOf(vpc);
+        if (idx === -1) continue;
+        if (Math.abs(idx + Math.floor(vpc.length / 2) - mid) <= hplLen * 2) {
+          return { digit: hintDigit, vpcKey: key };
+        }
+      }
     }
     return { digit: hintDigit, vpcKey: null };
   }
@@ -242,7 +246,7 @@ function onNumberInput(e) {
   const metaEl = document.getElementById('input-char-count');
   if (metaEl) {
     if (isRepdigit) {
-      metaEl.textContent = `${length.toLocaleString()} digits · repdigit ${digit}`;
+      metaEl.innerHTML = `<strong style="color:var(--green)">${length.toLocaleString()}</strong><span style="color:var(--text-secondary)"> digits · repdigit </span><strong style="color:var(--gold)">${digit}</strong>`;
     } else if (e.target.value.trim()) {
       metaEl.textContent = `${e.target.value.trim().length.toLocaleString()} digits`;
     } else {
@@ -318,7 +322,7 @@ async function loadFile(filename) {
 
   // Update selected-file badge
   const badge = document.getElementById('input-file-badge');
-  if (badge) badge.textContent = `◫ ${filename}`;
+  if (badge) badge.innerHTML = `<span style="color:var(--text-secondary)"> · filename </span><span style="color:var(--green)">◫</span> <strong style="color:var(--text-primary);font-weight:600">${filename}</strong>`;
 
   // Update Number Family from filename immediately (before async fetch).
   const fileDigit = filename.match(/^(\d)/)?.[1];
@@ -346,7 +350,7 @@ async function loadFile(filename) {
   if (ta) ta.value = mode === 'disk' ? 'Loading preview…' : 'Loading…';
 
   try {
-    const resp = await fetch(`/files/preview?name=${encodeURIComponent(filename)}`);
+    const resp = await fetch(`${BASE_PATH}/files/preview?name=${encodeURIComponent(filename)}`);
     if (resp.ok) {
       const text         = await resp.text();
       const truncated    = resp.headers.get('X-Preview-Truncated') === 'true';
@@ -394,6 +398,92 @@ function initFileBrowser() {
 }
 
 /* ============================================================
+   FILE GENERATE
+   ============================================================ */
+function initFileGenerate() {
+  document.querySelectorAll('.btn-gen:not(.btn-gen-disabled)').forEach(btn => {
+    btn.addEventListener('click', () => openGenPanel(btn));
+  });
+}
+
+function openGenPanel(btn) {
+  document.querySelectorAll('.gen-panel-row').forEach(r => r.remove());
+
+  const name = btn.dataset.filename;
+  if (!/^\d-\d+(k|m|b)\.txt$/.test(name)) {
+    alert('Cannot generate: filename does not match expected pattern.');
+    return;
+  }
+
+  const row = btn.closest('tr');
+  const panel = document.createElement('tr');
+  panel.className = 'gen-panel-row';
+  panel.innerHTML = `
+    <td colspan="4" style="padding:6px 10px;background:var(--bg-input,#1a1a2e);">
+      <span style="font-size:0.78rem;color:var(--text-secondary);margin-right:6px;">Expand <strong style="color:var(--cyan)">${name}</strong> by</span>
+      <select class="gen-factor-select" style="font-size:0.78rem;padding:2px 4px;background:var(--bg-card);color:var(--text-primary);border:1px solid var(--border);border-radius:3px;">
+        ${[2,3,4,5,6,7,8,9,10].map(n=>`<option value="${n}">${n}x</option>`).join('')}
+      </select>
+      <button class="btn-gen-confirm" style="margin-left:6px;font-size:0.78rem;padding:2px 8px;background:var(--cyan);color:#000;border:none;border-radius:3px;cursor:pointer;">Generate</button>
+      <button class="btn-gen-cancel" style="margin-left:4px;font-size:0.78rem;padding:2px 8px;background:transparent;color:var(--text-muted);border:1px solid var(--border);border-radius:3px;cursor:pointer;">Cancel</button>
+      <span class="gen-status" style="margin-left:8px;font-size:0.76rem;color:var(--text-muted);"></span>
+    </td>`;
+
+  row.after(panel);
+
+  panel.querySelector('.btn-gen-cancel').addEventListener('click', () => panel.remove());
+  panel.querySelector('.btn-gen-confirm').addEventListener('click', async () => {
+    const factor = parseInt(panel.querySelector('.gen-factor-select').value);
+    const status = panel.querySelector('.gen-status');
+    status.textContent = 'Generating…';
+    try {
+      const resp = await fetch(BASE_PATH + '/files/generate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name, factor}),
+      });
+      const result = await resp.json();
+      if (!resp.ok) {
+        status.style.color = 'var(--red)';
+        status.textContent = result.error || 'Error';
+        return;
+      }
+      panel.remove();
+      await refreshFileTable(result.name);
+    } catch (e) {
+      status.style.color = 'var(--red)';
+      status.textContent = 'Network error';
+    }
+  });
+}
+
+async function refreshFileTable(autoSelectName) {
+  try {
+    const resp = await fetch(BASE_PATH + '/files/list');
+    const files = await resp.json();
+    const tbody = document.querySelector('.file-table tbody');
+    if (!tbody) return;
+    tbody.innerHTML = files.map(f => {
+      const canGen = /^\d-\d+(k|m|b)\.txt$/.test(f.name);
+      const genDisabled = !FILE_GENERATE_ENABLED || !canGen;
+      return `<tr data-filename="${f.name}">
+        <td><span class="file-name">${f.name}</span></td>
+        <td><span class="file-size">${f.size_display}</span></td>
+        <td><button class="btn-use" type="button" data-filename="${f.name}">Use</button></td>
+        <td><button class="btn-gen${genDisabled ? ' btn-gen-disabled' : ''}"
+                    type="button" data-filename="${f.name}"
+                    ${genDisabled ? 'disabled' : ''}>Generate</button></td>
+      </tr>`;
+    }).join('');
+    initFileBrowser();
+    initFileGenerate();
+    if (autoSelectName) loadFile(autoSelectName);
+  } catch (e) {
+    console.error('refreshFileTable failed:', e);
+  }
+}
+
+/* ============================================================
    COLLAPSIBLE SECTIONS
    ============================================================ */
 function initCollapsibles() {
@@ -418,14 +508,15 @@ function initCollapsibles() {
 const INPUT_DISPLAY_CAP = 10_000; // max chars shown in the number textarea (disk mode)
 const RESULT_WINDOW     = 10_000; // chars per Prev/Next navigation window
 
-let _resultFull       = '';  // content of the currently-displayed result window
-let _resultLength     = 0;   // chars in the current window
-let _resultTotalChars = 0;   // true total chars in the full result (from server)
-let _windowOffset     = 0;   // absolute start position of current window in full result
-let _navOffset        = 0;   // legacy alias — equals _windowOffset
-let _currentPage      = 1;   // 1-based page number of current window
-let _totalPages       = 0;   // total pages = ceil(_resultTotalChars / RESULT_WINDOW)
-let _displayMode      = 'pyramid';  // 'standard' | 'pyramid'
+let _resultFull        = '';  // content of the currently-displayed result window
+let _resultLength      = 0;   // chars in the current window
+let _resultTotalChars  = 0;   // true total chars in the full result (from server)
+let _windowOffset      = 0;   // absolute start position of current window in full result
+let _navOffset         = 0;   // legacy alias — equals _windowOffset
+let _currentPage       = 1;   // 1-based page number of current window
+let _totalPages        = 0;   // total pages = ceil(_resultTotalChars / RESULT_WINDOW)
+let _displayMode       = 'pyramid';  // 'standard' | 'pyramid'
+let _lastResultOperation = '';  // operation used for the last calculation — passed to /calc/window
 
 let _highlightHpl = true;  // HPL pattern highlight toggle
 let _highlightHpr = true;  // HPR pattern highlight toggle
@@ -481,16 +572,24 @@ function renderWindowContent(text) {
   const vpcVal = vpcEl ? vpcEl.textContent.trim() : '';
 
   if (vpcVal && vpcVal !== '—' && text.includes(vpcVal)) {
-    const idx    = text.indexOf(vpcVal);
-    const before = text.slice(0, idx);
-    const after  = text.slice(idx + vpcVal.length);
-    display.innerHTML =
-      before +
-      `<span class="vpc-highlight">${vpcVal}</span>` +
-      after;
-  } else {
-    display.textContent = text;
+    const idx = text.indexOf(vpcVal);
+    // Reject coincidental VPC matches far from the TN centre (e.g. a VPC value that
+    // happens to appear at the end of the result due to an increment).
+    const absCenter = _windowOffset + idx + Math.floor(vpcVal.length / 2);
+    const tnCenter  = Math.floor(_resultTotalChars / 2);
+    const threshold = Math.max(50, Math.floor(_resultTotalChars * 0.005));
+    if (Math.abs(absCenter - tnCenter) <= threshold) {
+      const before = text.slice(0, idx);
+      const after  = text.slice(idx + vpcVal.length);
+      display.innerHTML =
+        before +
+        `<span class="vpc-highlight">${vpcVal}</span>` +
+        after;
+      display.scrollTop = 0;
+      return;
+    }
   }
+  display.textContent = text;
   display.scrollTop = 0;
 }
 
@@ -530,6 +629,30 @@ function colorizeStr(str, expected, cssClass) {
     }
   }
   return html;
+}
+
+/** Find best tile offset for a short string — used to colorize the pyramid apex area. */
+function apexBestOffset(pattern, text) {
+  let bestOff = 0, bestCount = -1;
+  for (let off = 0; off < pattern.length; off++) {
+    let count = 0;
+    for (let i = 0; i < text.length; i++)
+      if (text[i] === pattern[(off + i) % pattern.length]) count++;
+    if (count > bestCount) { bestCount = count; bestOff = off; }
+  }
+  return bestOff;
+}
+
+/**
+ * Render the VPC apex span.
+ * Exact match (wildPos null): entire value in vpc-highlight.
+ * Fuzzy match: matched chars in vpc-highlight, changed char as plain text (renders green).
+ */
+function vpcApexHtml(matchedVpc, wildPos) {
+  if (wildPos === null || wildPos === undefined) {
+    return '<span class="vpc-highlight">' + matchedVpc + '</span>';
+  }
+  return matchedVpc; // no exact match — plain text inherits green from .number-display
 }
 
 /**
@@ -579,52 +702,6 @@ function findBestVpcIdx(text, vpcVal, hpl) {
   return fallback;
 }
 
-/**
- * Fuzzy VPC search when exact match fails.
- * Expands outward from the text midpoint (VPC is always near the center).
- * Tries all vpcLen wildcard positions: any single char may differ from vpcVal.
- * Returns { idx, matchedVpc, wildPos } for the first tile-aligned fuzzy match,
- * or the first fuzzy match closest to center if no tile-aligned one is found.
- */
-function findFuzzyVpcIdx(text, vpcVal, hpl) {
-  const vpcLen = vpcVal.length;
-  const hplLen = hpl.length;
-  const mid    = Math.floor(text.length / 2);
-
-  let firstFuzzy = null; // closest-to-center fuzzy match (fallback if no tile-aligned)
-
-  for (let offset = 0; offset <= mid + vpcLen; offset++) {
-    const positions = offset === 0 ? [mid] : [mid - offset, mid + offset];
-    for (const pos of positions) {
-      if (pos < 0 || pos + vpcLen > text.length) continue;
-      const candidate = text.slice(pos, pos + vpcLen);
-
-      for (let wildPos = 0; wildPos < vpcLen; wildPos++) {
-        let ok = true;
-        for (let i = 0; i < vpcLen; i++) {
-          if (i === wildPos) {
-            if (!/\d/.test(candidate[i])) { ok = false; break; }
-          } else {
-            if (candidate[i] !== vpcVal[i]) { ok = false; break; }
-          }
-        }
-        if (!ok) continue;
-
-        // Fuzzy match found — save as fallback (first = closest to center)
-        if (!firstFuzzy) firstFuzzy = { idx: pos, matchedVpc: candidate, wildPos };
-
-        // Prefer a tile-aligned occurrence
-        for (let lr = 0; lr < hplLen; lr++) {
-          if (pos >= hplLen + lr && text.slice(pos - hplLen - lr, pos - lr) === hpl) {
-            return { idx: pos, matchedVpc: candidate, wildPos };
-          }
-        }
-      }
-    }
-  }
-
-  return firstFuzzy; // null if nothing matched at all
-}
 
 function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   if (!vpcVal || vpcVal === '—') return null;
@@ -633,30 +710,46 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   const hplLen = hpl.length;
   const hprLen = hpr.length;
 
+  // Digits 3, 6, 9 have 1-char HPL/HPR patterns. Expand to 9-char virtual tiles so the
+  // pyramid shows the same per-row character count as 9-char-pattern digits (1,2,4,5,7,8).
+  // For digits where hplLen=9 already, tileHpl === hpl — no change to any computation.
+  const TARGET_TILE_WIDTH = 9;
+  const tileHpl    = hplLen < TARGET_TILE_WIDTH
+    ? hpl.repeat(TARGET_TILE_WIDTH).slice(0, TARGET_TILE_WIDTH) : hpl;
+  const tileHpr    = hprLen < TARGET_TILE_WIDTH
+    ? hpr.repeat(TARGET_TILE_WIDTH).slice(0, TARGET_TILE_WIDTH) : hpr;
+  const tileHplLen = tileHpl.length;
+  const tileHprLen = tileHpr.length;
+
   // Look up lc prefix length for this digit family (digits 5, 7, 9 have a 1-char lc prefix).
   // leftFull tiles start after the lc prefix.
-  let lcLen = 0;
+  let lcLen = 0, lcStr = '';
   for (const data of Object.values(MATRIX)) {
-    if (data.hpl === hpl) { lcLen = data.lc ? data.lc.length : 0; break; }
+    if (data.hpl === hpl) { lcLen = data.lc ? data.lc.length : 0; lcStr = data.lc || ''; break; }
   }
 
   // Find vpcIdx with tile-alignment verification (rejects coincidental matches in changed zones).
   let vpcIdx      = findBestVpcIdx(text, vpcVal, hpl);
-  let activeVpc   = vpcVal;  // may be overridden by fuzzy match
-  let vpcWildPos  = null;    // null = exact match; 0/1/2 = which char was changed
+  let activeVpc   = vpcVal;
+  let vpcWildPos  = null;    // null = exact match; -1 = no match (apex renders green)
+
+  // Reject false-positive VPC matches more than ~2 tile-widths from the text centre.
+  // A VPC found near the end/start is always a coincidental substring match, not the real apex.
+  if (vpcIdx !== -1) {
+    const mid       = Math.floor(text.length / 2);
+    const vpcCenter = vpcIdx + Math.floor(vpcVal.length / 2);
+    if (Math.abs(vpcCenter - mid) > tileHplLen * 2) vpcIdx = -1;
+  }
 
   if (vpcIdx === -1) {
-    // Exact match failed — try 2-of-3 fuzzy match expanding from center outward.
-    const fuzzy = findFuzzyVpcIdx(text, vpcVal, hpl);
-    if (fuzzy) {
-      vpcIdx     = fuzzy.idx;
-      activeVpc  = fuzzy.matchedVpc;
-      vpcWildPos = fuzzy.wildPos;
-      console.log('[buildPyramid] fuzzy VPC:', JSON.stringify(activeVpc),
-        '(expected', JSON.stringify(vpcVal) + ') at idx', vpcIdx, 'wildPos=', vpcWildPos);
-    }
+    // No exact match near centre — use the same midpoint formula as the Python backend
+    // (_mid = len // 2, vpcStart = _mid - vpcLen // 2) so the pyramid apex aligns with
+    // MID-PATTERN. leftFull tiles start from lcLen (unchanged for small increments) and
+    // compare correctly against hpl with colorizeStr regardless of leftRemLen.
+    vpcIdx    = Math.floor(text.length / 2) - Math.floor(vpcVal.length / 2);
+    activeVpc = text.slice(vpcIdx, vpcIdx + vpcVal.length);
+    vpcWildPos = -1;
   }
-  if (vpcIdx === -1) return null;
 
   const leftPart  = text.slice(0, vpcIdx);
   const rightPart = text.slice(vpcIdx + activeVpc.length);
@@ -665,28 +758,28 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   // Python build_left tiles L→R: full tiles then hpl[0:rem] at the end.
   // So leftRemStr = head of hpl (first leftRemLen chars).
   const leftTilesPart = leftPart.slice(lcLen);
-  const leftRemLen    = leftTilesPart.length % hplLen;
+  const leftRemLen    = leftTilesPart.length % tileHplLen;
   const leftRemStr    = leftRemLen > 0 ? leftTilesPart.slice(-leftRemLen) : '';
   const leftFullStr   = leftRemLen > 0 ? leftTilesPart.slice(0, -leftRemLen) : leftTilesPart;
   const leftFull      = [];
-  for (let i = 0; i < leftFullStr.length; i += hplLen)
-    leftFull.push(leftFullStr.slice(i, i + hplLen));
+  for (let i = 0; i < leftFullStr.length; i += tileHplLen)
+    leftFull.push(leftFullStr.slice(i, i + tileHplLen));
 
   // Right: use natural tile boundaries (modular rem).
   // For pure repdigit: rem = tail-of-hpr prefix length; full tiles = hpr exactly.
   // For increment: rem = same formula; full tiles = a fixed rotation of hpr (all equal).
   // Natural boundaries ensure Pyramid content matches Standard mode char-for-char.
-  const rightRemLen  = rightPart.length % hprLen;
+  const rightRemLen  = rightPart.length % tileHprLen;
   const rightRemStr  = rightRemLen > 0 ? rightPart.slice(0, rightRemLen) : '';
   const rightFullStr = rightRemLen > 0 ? rightPart.slice(rightRemLen) : rightPart;
   const rightFull    = [];
-  for (let i = 0; i + hprLen <= rightFullStr.length; i += hprLen)
-    rightFull.push(rightFullStr.slice(i, i + hprLen));
-  // Always override last tile with the true last hprLen chars of the result.
+  for (let i = 0; i + tileHprLen <= rightFullStr.length; i += tileHprLen)
+    rightFull.push(rightFullStr.slice(i, i + tileHprLen));
+  // Always override last tile with the true last tileHprLen chars of the result.
   // Inner tiles repeat the same rotation; the last tile carries the actual final digit
   // which may differ after any increment.
   if (rightFull.length > 0)
-    rightFull[rightFull.length - 1] = rightPart.slice(-hprLen);
+    rightFull[rightFull.length - 1] = rightPart.slice(-tileHprLen);
 
   const N      = leftFull.length;
   const M      = rightFull.length;
@@ -699,11 +792,11 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
     ' rightFull[M-1]=' + JSON.stringify(rightFull[M - 1]));
 
   // cap = max rows to show. gapCol = column where VPC starts in every row.
-  // Row k text widths: left = k*hplLen + leftRemLen, right = rightRemLen + k*hprLen.
-  // leftPad = gapCol - (k*hplLen + leftRemLen) = (cap-k)*hplLen  (purely arithmetic).
+  // Row k text widths: left = k*tileHplLen + leftRemLen, right = rightRemLen + k*tileHprLen.
+  // leftPad = gapCol - (k*tileHplLen + leftRemLen) = (cap-k)*tileHplLen  (purely arithmetic).
   const cap    = Math.min(N, M, MAX_PYRAMID_ROWS);
   if (cap === 0) return null;
-  const gapCol = cap * hplLen + leftRemLen;  // column where VPC starts
+  const gapCol = lcLen + cap * tileHplLen + leftRemLen;  // column where VPC starts
 
   // Colorize helpers for the partial rem slots:
   //   leftRem aligns to hpl HEAD  (hpl[0:leftRemLen])
@@ -711,25 +804,50 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   //     For pure repdigit: rightFull[0] = hpr, so this equals hpr[-rightRemLen:] (same as before).
   //     For increment: rightFull[0] is a rotation of hpr; using its tail gives the correct
   //     expected value for the partial slot, so only genuinely changed chars show as green.
-  const colorLeftRem  = () => colorizeStr(leftRemStr,  hpl.slice(0, leftRemLen), 'hpl-match');
+  const colorLeftRem  = () => colorizeStr(leftRemStr,  tileHpl.slice(0, leftRemLen), 'hpl-match');
   const colorRightRem = () => colorizeStr(
     rightRemStr,
-    (rightFull.length > 1 ? rightFull[0] : hpr).slice(hprLen - rightRemLen),
+    (hprLen < TARGET_TILE_WIDTH ? tileHpr : (rightFull.length > 1 ? rightFull[0] : tileHpr))
+      .slice(tileHprLen - rightRemLen),
     'hpr-match'
   );
 
   const lines = [];
 
-  // Apex row: leftRem + VPC (red) + rightRem — the partial patterns adjacent to the constant.
+  // Apex row: leftRem + VPC/centre + rightRem.
   {
-    const apexLeft  = (leftRemLen  > 0 && highlightHpl) ? colorLeftRem()  : leftRemStr;
-    const apexRight = (rightRemLen > 0 && highlightHpr) ? colorRightRem() : rightRemStr;
-    lines.push(
-      ' '.repeat(cap * hplLen) +
-      apexLeft +
-      vpcApexHtml(activeVpc, vpcWildPos) +
-      apexRight
-    );
+    if (vpcWildPos === null) {
+      // Exact VPC match — existing path: HPL leftRem, red VPC, HPR rightRem.
+      const apexLeft  = (leftRemLen  > 0 && highlightHpl) ? colorLeftRem()  : leftRemStr;
+      const apexRight = (rightRemLen > 0 && highlightHpr) ? colorRightRem() : rightRemStr;
+      lines.push(' '.repeat(lcLen + cap * tileHplLen) + apexLeft + vpcApexHtml(activeVpc, null) + apexRight);
+    } else {
+      // No VPC match — extend HPL/HPR through the VPC space using bestOffset.
+      // The exact centre char (index leftRemLen + floor(vpcLen/2)) stays plain green.
+      // This mirrors colorizePattern's Step 1/2 algorithm for the apex area.
+      const apexStr  = leftRemStr + activeVpc + rightRemStr;
+      const center   = leftRemLen + Math.floor(vpcLen / 2);
+
+      const leftApex = apexStr.slice(0, center);
+      const hplOff   = apexBestOffset(hpl, leftApex);
+      let leftHtml = '';
+      for (let i = 0; i < leftApex.length; i++) {
+        const match = highlightHpl && leftApex[i] === hpl[(hplOff + i) % hplLen];
+        leftHtml += match ? `<span class="hpl-match">${leftApex[i]}</span>` : leftApex[i];
+      }
+
+      const centerHtml = apexStr[center] ?? '';
+
+      const rightApex = apexStr.slice(center + 1);
+      const hprOff    = apexBestOffset(hpr, rightApex);
+      let rightHtml = '';
+      for (let i = 0; i < rightApex.length; i++) {
+        const match = highlightHpr && rightApex[i] === hpr[(hprOff + i) % hprLen];
+        rightHtml += match ? `<span class="hpr-match">${rightApex[i]}</span>` : rightApex[i];
+      }
+
+      lines.push(' '.repeat(lcLen + cap * tileHplLen) + leftHtml + centerHtml + rightHtml);
+    }
   }
 
   // Body rows k=1..cap: k tiles on each side, growing wider per row.
@@ -748,12 +866,17 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   //   Upper rows: tiles match baseline → all amber.
   //   Bottom row: inner tiles match → amber; changed end tiles differ → green.
   const rightBaseline = rightFull[M - cap];
+  // For short patterns (digits 3, 6, 9), compare right tiles against fixed tileHpr so that
+  // incremented chars always show green. rightBaseline is derived from content and absorbs
+  // changes when a large increment modifies many tiles, producing false amber matches.
+  // For 9-char pattern digits, rightBaseline handles hpr rotations correctly — keep as-is.
+  const rightExpected = hprLen < TARGET_TILE_WIDTH ? tileHpr : rightBaseline;
 
   for (let k = 1; k <= cap; k++) {
     let leftContent = '';
     if (highlightHpl) {
       for (let i = 0; i < k; i++)
-        leftContent += colorizeStr(leftFull[i], hpl, 'hpl-match');
+        leftContent += colorizeStr(leftFull[i], tileHpl, 'hpl-match');
     } else {
       for (let i = 0; i < k; i++) leftContent += leftFull[i];
     }
@@ -762,18 +885,39 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
     let rightContent = '';
     if (highlightHpr) {
       for (let i = rStart; i < rStart + k; i++)
-        rightContent += colorizeStr(rightFull[i], rightBaseline, 'hpr-match');
+        rightContent += colorizeStr(rightFull[i], rightExpected, 'hpr-match');
     } else {
       for (let i = rStart; i < rStart + k; i++) rightContent += rightFull[i];
     }
 
-    // leftPad: text length of leftContent = k*hplLen (no partial).
-    // gapCol = cap*hplLen + leftRemLen → leftPad = (cap-k)*hplLen + leftRemLen.
-    const leftPad = ' '.repeat((cap - k) * hplLen + leftRemLen);
-    lines.push(leftPad + leftContent + ' '.repeat(vpcLen) + rightContent);
+    // leftPad: text length of leftContent = k*tileHplLen (no partial).
+    // gapCol = lcLen + cap*tileHplLen + leftRemLen → leftPad = lcLen + (cap-k)*tileHplLen + leftRemLen.
+    // Bottom row (k=cap): lc prefix rendered as plain green text before tiles; leftPad = leftRemLen.
+    // Upper rows (k<cap): lcLen extra leading spaces maintain VPC column alignment.
+    const leftPad = (k === cap && lcLen > 0)
+      ? ' '.repeat(leftRemLen)
+      : ' '.repeat(lcLen + (cap - k) * tileHplLen + leftRemLen);
+    const lcPrefix = (k === cap) ? lcStr : '';
+    lines.push(leftPad + lcPrefix + leftContent + ' '.repeat(vpcLen) + rightContent);
   }
 
-  return { html: lines.join('\n'), gapCol };
+  // Integrity check: compare pyramid's assembled TN start against text.
+  // lcStr is the only non-text-derived value; a mismatch means the pyramid shows
+  // a wrong character (e.g. lc digit stale after an increment carry).
+  const mismatches = [];
+  const pyramidLeft = lcStr + leftFull.slice(0, cap).join('');
+  const expectedLeft = text.slice(0, lcLen + cap * tileHplLen);
+  for (let i = 0; i < pyramidLeft.length; i++) {
+    if (pyramidLeft[i] !== expectedLeft[i]) {
+      mismatches.push(
+        'pos ' + i + ': pyramid shows \'' + pyramidLeft[i] +
+        '\', TN has \'' + expectedLeft[i] + '\''
+      );
+      break;
+    }
+  }
+
+  return { html: lines.join('\n'), gapCol, mismatches };
 }
 
 /** Render the current result window as a pyramid into #number-display. */
@@ -832,7 +976,7 @@ function renderPyramid() {
     return;
   }
 
-  const { html: pyramid, gapCol } = result;
+  const { html: pyramid, gapCol, mismatches } = result;
   display.classList.add('pyramid-mode');
   // Set overflow on the container div; whitespace preservation is handled by the
   // inner <pre class="pyramid-inner"> which uses the browser UA stylesheet's
@@ -842,7 +986,12 @@ function renderPyramid() {
   display.style.overflowWrap = '';
   display.style.overflowX = 'auto';
   display.style.overflowY = 'auto';
-  display.innerHTML = '<pre class="pyramid-inner">' + pyramid + '</pre>';
+  const mismatchBanner = mismatches.length > 0
+    ? '<div class="error-box" style="margin:0 0 8px 0;flex-shrink:0;">&#9888; Pyramid &ne; Standard view &mdash; '
+      + mismatches.map(m => m.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/'/g, '&#39;')).join('; ')
+      + '</div>'
+    : '';
+  display.innerHTML = mismatchBanner + '<pre class="pyramid-inner">' + pyramid + '</pre>';
   display.scrollTop = 0;
 
   // Auto-scroll horizontally to center the VPC column in the viewport
@@ -892,7 +1041,7 @@ async function loadWindow(offset) {
   if (_resultTotalChars > 0 && offset >= _resultTotalChars) return;
 
   try {
-    const resp = await fetch(`/calc/window?offset=${offset}&length=${RESULT_WINDOW}`);
+    const resp = await fetch(`${BASE_PATH}/calc/window?offset=${offset}&length=${RESULT_WINDOW}&operation=${encodeURIComponent(_lastResultOperation)}`);
     if (!resp.ok) return;
     const data = await resp.json();
 
@@ -928,6 +1077,8 @@ async function loadWindow(offset) {
 function onResultSwap() {
   const fullEl = document.getElementById('result-full');
   if (!fullEl) return;
+
+  _lastResultOperation = document.getElementById('operation')?.value || '';
 
   // Seed state from the server-rendered first window (up to 10 000 chars).
   _resultFull   = fullEl.textContent;
@@ -969,10 +1120,21 @@ function onResultSwap() {
 /* ============================================================
    HTMX EVENT HOOKS
    ============================================================ */
+function colorizeResultPatterns() {
+  document.querySelectorAll('.pattern-colorize').forEach(el => {
+    const pattern = el.dataset.pattern;
+    const digit = el.dataset.digit;
+    if (pattern && digit && typeof colorizePattern === 'function') {
+      el.innerHTML = colorizePattern(pattern, digit, el.dataset.end === 'true');
+    }
+  });
+}
+
 document.addEventListener('htmx:afterSwap', (e) => {
   // After result partial is swapped in, init nav and animate
   if (e.detail.target?.id === 'result-panel') {
     onResultSwap();
+    colorizeResultPatterns();
     const display = document.getElementById('number-display');
     if (display) {
       display.classList.add('htmx-added');
@@ -1097,6 +1259,7 @@ function initIncrementSteppers() {
 document.addEventListener('DOMContentLoaded', () => {
   initDigitSelector();
   initFileBrowser();
+  initFileGenerate();
   initCollapsibles();
   initResultNav();
   initCopyButton();
@@ -1118,5 +1281,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // and Prev/Next load out-of-range chunks, blanking the display.
   if (document.getElementById('result-full')) {
     onResultSwap();
+    colorizeResultPatterns();
   }
 });

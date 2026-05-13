@@ -35,6 +35,22 @@
       <span class="stat-label" style="color: var(--amber);">⚠ showing 10,000 of {{ '{:,}'.format(result_total_chars) }} digits</span>
     </div>
     {% endif %}
+    {% if mid_pattern or end_pattern %}
+    <div style="margin-left:auto; display:flex; flex-direction:column; gap:5px; align-items:flex-end;">
+      {% if mid_pattern %}
+      <div class="result-pattern-item">
+        <span class="stat-label">MID-PATTERN</span>
+        <span class="pattern-colorize" data-pattern="{{ mid_pattern }}" data-digit="{{ repdigit }}" style="font-family:var(--font-mono);font-size:0.65rem;letter-spacing:0.02em;">{{ mid_pattern }}</span>
+      </div>
+      {% endif %}
+      {% if end_pattern %}
+      <div class="result-pattern-item">
+        <span class="stat-label">END-PATTERN</span>
+        <span class="pattern-colorize" data-pattern="{{ end_pattern }}" data-digit="{{ repdigit }}" data-end="true" style="font-family:var(--font-mono);font-size:0.65rem;letter-spacing:0.02em;">{{ end_pattern }}</span>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
   </div>
 
   {# ---- Navigation ---- #}

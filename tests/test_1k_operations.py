@@ -120,6 +120,19 @@ def test_tri_matrix_stream_matches_gmpy2(digit, tmp_path):
 
 
 @pytest.mark.parametrize("digit", [str(d) for d in range(1, 10)])
+def test_tri_div_simpy_matches_gmpy2(digit):
+    """tri_div_simpy_formula must match gmpy2 baseline for all repdigits 1-9.
+    Uses direct n*(n+1)/2 formula — no matrix constants, so digit 8 is not affected by BUG-001."""
+    num_str = _read_input(digit)
+    baseline = _gmpy2_baseline(num_str)
+    result = str(ManualBigNumber(num_str).triangular_number_sympi_division(num_str))
+    assert result == baseline, (
+        f"Digit {digit}: tri_div_simpy result length {len(result)} "
+        f"differs from gmpy2 baseline length {len(baseline)}"
+    )
+
+
+@pytest.mark.parametrize("digit", [str(d) for d in range(1, 10)])
 def test_window_extraction_consistent_across_modes(digit, tmp_path):
     """
     Window extractions from tri_matrix_memory and tri_matrix_stream must be identical
