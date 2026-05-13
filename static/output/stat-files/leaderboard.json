@@ -1,5 +1,10 @@
+<<<<<<< HEAD
 [
   {
+=======
+{
+  "tri_matrix": {
+>>>>>>> main
     "ts": "2026-04-19T19:04:59",
     "method": "tri_matrix",
     "repdigit": "1",

@@ -656,6 +656,26 @@ function vpcApexHtml(matchedVpc, wildPos) {
 }
 
 /**
+ * Render the VPC apex span.
+ * Exact match (wildPos null): entire value in vpc-highlight.
+ * Fuzzy match: matched chars in vpc-highlight, changed char as plain text (renders green).
+ */
+function vpcApexHtml(matchedVpc, wildPos) {
+  if (wildPos === null || wildPos === undefined) {
+    return '<span class="vpc-highlight">' + matchedVpc + '</span>';
+  }
+  let html = '';
+  for (let i = 0; i < matchedVpc.length; i++) {
+    if (i === wildPos) {
+      html += matchedVpc[i]; // plain — inherits green (this digit was changed by increment)
+    } else {
+      html += '<span class="vpc-highlight">' + matchedVpc[i] + '</span>';
+    }
+  }
+  return html;
+}
+
+/**
  * Find the VPC index using tile-alignment verification.
  * Rejects coincidental VPC occurrences (e.g. in a +1 incremented TN) by checking
  * that the tile immediately to the left of the candidate position matches hpl.
