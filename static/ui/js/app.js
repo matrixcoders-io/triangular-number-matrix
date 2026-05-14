@@ -517,6 +517,7 @@ let _currentPage       = 1;   // 1-based page number of current window
 let _totalPages        = 0;   // total pages = ceil(_resultTotalChars / RESULT_WINDOW)
 let _displayMode       = 'pyramid';  // 'standard' | 'pyramid'
 let _lastResultOperation = '';  // operation used for the last calculation — passed to /calc/window
+let _lastResultFileStem  = '';  // input file stem (e.g. '1-1k') for the last calculation — passed to /calc/window
 
 let _highlightHpl = true;  // HPL pattern highlight toggle
 let _highlightHpr = true;  // HPR pattern highlight toggle
@@ -1041,7 +1042,11 @@ async function loadWindow(offset) {
   if (_resultTotalChars > 0 && offset >= _resultTotalChars) return;
 
   try {
-    const resp = await fetch(`${BASE_PATH}/calc/window?offset=${offset}&length=${RESULT_WINDOW}&operation=${encodeURIComponent(_lastResultOperation)}`);
+    const resp = await fetch(
+      `${BASE_PATH}/calc/window?offset=${offset}&length=${RESULT_WINDOW}` +
+      `&operation=${encodeURIComponent(_lastResultOperation)}` +
+      `&file_stem=${encodeURIComponent(_lastResultFileStem)}`
+    );
     if (!resp.ok) return;
     const data = await resp.json();
 
@@ -1079,6 +1084,8 @@ function onResultSwap() {
   if (!fullEl) return;
 
   _lastResultOperation = document.getElementById('operation')?.value || '';
+  const _fhEl = document.getElementById('file-name-hidden');
+  _lastResultFileStem = _fhEl ? _fhEl.value.replace(/\.txt$/i, '') : '';
 
   // Seed state from the server-rendered first window (up to 10 000 chars).
   _resultFull   = fullEl.textContent;
