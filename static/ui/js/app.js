@@ -500,6 +500,26 @@ function initCollapsibles() {
   });
 }
 
+function initExpandButtons() {
+  document.querySelectorAll('.btn-expand').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const panel = document.getElementById(btn.dataset.panel);
+      if (!panel) return;
+      panel.classList.add('panel-expanded');
+      document.body.classList.add('panel-expanded-active');
+    });
+  });
+
+  document.querySelectorAll('.btn-close-panel').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const panel = btn.closest('.panel');
+      if (!panel) return;
+      panel.classList.remove('panel-expanded');
+      document.body.classList.remove('panel-expanded-active');
+    });
+  });
+}
+
 /* ============================================================
    RESULT WINDOW NAVIGATION
    Manages a client-side view into the full result string.
@@ -1268,6 +1288,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initFileBrowser();
   initFileGenerate();
   initCollapsibles();
+  initExpandButtons();
   initResultNav();
   initCopyButton();
   initPatternToggles();

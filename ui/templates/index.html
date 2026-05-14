@@ -193,11 +193,19 @@
 {# ══════════════════════════════════════════════════════════════════
    FILE LIBRARY (scrollable)
    ══════════════════════════════════════════════════════════════════ #}
-<div class="panel">
+<div class="panel" id="panel-file-library">
   <div class="panel-header">
-    <span class="panel-title"><span class="panel-title-icon">◫</span>File Library</span>
-    <span class="panel-subtitle">{{ file_names | length }} files · click Use to load</span>
+    <div>
+      <span class="panel-title"><span class="panel-title-icon">◫</span>File Library</span>
+      <span class="panel-subtitle">{{ file_names | length }} files · click Use to load</span>
+    </div>
+    <div class="panel-header-actions">
+      <button class="btn-close-panel btn-nav" type="button" title="Close expanded view">✕</button>
+      <button class="btn-expand btn-nav" type="button" data-panel="panel-file-library" title="Expand">⤢</button>
+      <button class="collapsible-toggle btn-nav" type="button" data-target="file-library-body" aria-expanded="true"><span class="collapse-icon" style="display:inline-block; transition: transform 0.2s;">▼</span></button>
+    </div>
   </div>
+  <div id="file-library-body">
   <div class="panel-body" style="padding: 0;">
     <div style="max-height: 290px; overflow-y: auto;">
       <table class="file-table">
@@ -234,24 +242,24 @@
       </table>
     </div>
   </div>
+  </div>
 </div>
 
 
 {# ══════════════════════════════════════════════════════════════════
    RUN HISTORY / LEADER BOARD (collapsible, tabbed)
    ══════════════════════════════════════════════════════════════════ #}
-<div class="panel">
+<div class="panel" id="panel-history">
   <div class="panel-header">
     <div class="panel-tabs">
       <button class="panel-tab active" id="tab-history" type="button">⟳ Run History</button>
       <button class="panel-tab" id="tab-leaderboard" type="button">⊕ Leader Board</button>
     </div>
-    <button
-      class="collapsible-toggle btn-nav"
-      type="button"
-      data-target="history-body"
-      aria-expanded="true"
-    ><span class="collapse-icon" style="display:inline-block; transition: transform 0.2s;">▼</span></button>
+    <div class="panel-header-actions">
+      <button class="btn-close-panel btn-nav" type="button" title="Close expanded view">✕</button>
+      <button class="btn-expand btn-nav" type="button" data-panel="panel-history" title="Expand">⤢</button>
+      <button class="collapsible-toggle btn-nav" type="button" data-target="history-body" aria-expanded="true"><span class="collapse-icon" style="display:inline-block; transition: transform 0.2s;">▼</span></button>
+    </div>
   </div>
   <div id="history-body">
     <div class="panel-body" style="padding: 0;">
@@ -286,7 +294,7 @@
 {# ══════════════════════════════════════════════════════════════════
    LAB — Test Suite (collapsible)
    ══════════════════════════════════════════════════════════════════ #}
-<div class="panel">
+<div class="panel" id="panel-lab">
   <div class="panel-header">
     <span class="panel-title"><span class="panel-title-icon">⚗</span>Lab — Test Suite</span>
     <div style="display:flex; gap:10px; align-items:center;">
@@ -299,6 +307,8 @@
         hx-indicator="#lab-spinner"
       >▶ Run Tests</button>
       <span id="lab-spinner" class="htmx-indicator" style="color: var(--cyan); font-size: 0.8rem;">running…</span>
+      <button class="btn-close-panel btn-nav" type="button" title="Close expanded view">✕</button>
+      <button class="btn-expand btn-nav" type="button" data-panel="panel-lab" title="Expand">⤢</button>
       <button
         class="collapsible-toggle btn-nav"
         type="button"

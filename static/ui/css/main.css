@@ -1380,3 +1380,56 @@ body {
   .top-grid { grid-template-columns: 1fr; }
   .controls-row { grid-template-columns: 1fr; }
 }
+
+/* ── Panel collapse ─────────────────────────────────────────────── */
+.collapsed { display: none; }
+
+/* ── Panel header action group (right-side buttons) ─────────────── */
+.panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Close button is hidden by default; shown only when panel is expanded */
+.btn-close-panel { display: none; }
+
+/* ── Full-screen expanded panel ─────────────────────────────────── */
+.panel.panel-expanded {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-card);
+}
+
+/* Body wrappers fill remaining height; visible even when internally collapsed */
+.panel.panel-expanded #file-library-body,
+.panel.panel-expanded #history-body,
+.panel.panel-expanded #lab-body {
+  flex: 1;
+  overflow-y: auto;
+  display: flex !important;
+  flex-direction: column;
+}
+
+/* Remove max-height caps inside expanded panel */
+.panel.panel-expanded #history-table-wrap,
+.panel.panel-expanded #leaderboard-table-wrap,
+.panel.panel-expanded #lab-output {
+  max-height: none !important;
+  flex: 1;
+}
+.panel.panel-expanded .panel-body > div[style*="max-height"] {
+  max-height: none !important;
+}
+
+/* Show close, hide expand when expanded */
+.panel.panel-expanded .btn-close-panel { display: inline-flex; }
+.panel.panel-expanded .btn-expand      { display: none; }
+
+/* Lock body scroll behind the overlay */
+body.panel-expanded-active { overflow: hidden; }
