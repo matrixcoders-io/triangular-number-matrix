@@ -191,6 +191,51 @@
 
 
 {# ══════════════════════════════════════════════════════════════════
+   RUN HISTORY / LEADER BOARD (collapsible, tabbed)
+   ══════════════════════════════════════════════════════════════════ #}
+<div class="panel" id="panel-history">
+  <div class="panel-header">
+    <div class="panel-tabs">
+      <button class="panel-tab active" id="tab-history" type="button">⟳ Run History</button>
+      <button class="panel-tab" id="tab-leaderboard" type="button">⊕ Leader Board</button>
+    </div>
+    <div class="panel-header-actions">
+      <button class="btn-close-panel btn-nav" type="button" title="Close expanded view">✕</button>
+      <button class="btn-expand btn-nav" type="button" data-panel="panel-history" title="Expand">⤢</button>
+      <button class="collapsible-toggle btn-nav" type="button" data-target="history-body" aria-expanded="true"><span class="collapse-icon" style="display:inline-block; transition: transform 0.2s;">▼</span></button>
+    </div>
+  </div>
+  <div id="history-body">
+    <div class="panel-body" style="padding: 0;">
+
+      {# ── Run History section ── #}
+      <div id="history-section">
+        <div
+          id="history-table-wrap"
+          hx-get="/stats/history"
+          hx-trigger="load, calcDone from:body"
+          hx-swap="innerHTML"
+          style="max-height: 220px; overflow-y: auto; padding: 12px 20px;"
+        ><span style="color: var(--text-secondary); font-size: 0.82rem;">Loading…</span></div>
+      </div>
+
+      {# ── Leader Board section (hidden by default) ── #}
+      <div id="leaderboard-section" style="display:none;">
+        <div
+          id="leaderboard-table-wrap"
+          hx-get="/stats/leaderboard"
+          hx-trigger="load, calcDone from:body"
+          hx-swap="innerHTML"
+          style="max-height: 220px; overflow-y: auto; padding: 12px 20px;"
+        ><span style="color: var(--text-secondary); font-size: 0.82rem;">Loading…</span></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+{# ══════════════════════════════════════════════════════════════════
    FILE LIBRARY (scrollable)
    ══════════════════════════════════════════════════════════════════ #}
 <div class="panel" id="panel-file-library">
@@ -242,51 +287,6 @@
       </table>
     </div>
   </div>
-  </div>
-</div>
-
-
-{# ══════════════════════════════════════════════════════════════════
-   RUN HISTORY / LEADER BOARD (collapsible, tabbed)
-   ══════════════════════════════════════════════════════════════════ #}
-<div class="panel" id="panel-history">
-  <div class="panel-header">
-    <div class="panel-tabs">
-      <button class="panel-tab active" id="tab-history" type="button">⟳ Run History</button>
-      <button class="panel-tab" id="tab-leaderboard" type="button">⊕ Leader Board</button>
-    </div>
-    <div class="panel-header-actions">
-      <button class="btn-close-panel btn-nav" type="button" title="Close expanded view">✕</button>
-      <button class="btn-expand btn-nav" type="button" data-panel="panel-history" title="Expand">⤢</button>
-      <button class="collapsible-toggle btn-nav" type="button" data-target="history-body" aria-expanded="true"><span class="collapse-icon" style="display:inline-block; transition: transform 0.2s;">▼</span></button>
-    </div>
-  </div>
-  <div id="history-body">
-    <div class="panel-body" style="padding: 0;">
-
-      {# ── Run History section ── #}
-      <div id="history-section">
-        <div
-          id="history-table-wrap"
-          hx-get="/stats/history"
-          hx-trigger="load, calcDone from:body"
-          hx-swap="innerHTML"
-          style="max-height: 220px; overflow-y: auto; padding: 12px 20px;"
-        ><span style="color: var(--text-secondary); font-size: 0.82rem;">Loading…</span></div>
-      </div>
-
-      {# ── Leader Board section (hidden by default) ── #}
-      <div id="leaderboard-section" style="display:none;">
-        <div
-          id="leaderboard-table-wrap"
-          hx-get="/stats/leaderboard"
-          hx-trigger="load, calcDone from:body"
-          hx-swap="innerHTML"
-          style="max-height: 220px; overflow-y: auto; padding: 12px 20px;"
-        ><span style="color: var(--text-secondary); font-size: 0.82rem;">Loading…</span></div>
-      </div>
-
-    </div>
   </div>
 </div>
 
