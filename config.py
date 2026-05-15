@@ -26,16 +26,13 @@ TN_OUT_FILE     = os.path.join(TN_FILES_DIR, "tn-file.txt")
 TN_LAST_RESULT  = os.path.join(TN_FILES_DIR, "tn-last-result.txt")
 
 # ---------------------------------------------------------------------------
-# UI file transfer options
+# Input char limit
 # ---------------------------------------------------------------------------
-# Set UI_HTTP_FILE_TRANSFER=false at startup to disable HTTP mode entirely.
-# The radio toggle will be hidden and all files are read server-side (disk-direct).
-UI_HTTP_FILE_TRANSFER = os.environ.get("UI_HTTP_FILE_TRANSFER", "true").lower() == "true"
-
-# Maximum number of digits allowed for HTTP transfer to the browser.
-# Files with more digits than this will force disk-direct mode automatically.
-# Override at startup: UI_HTTP_FILE_MAX_DIGITS=5000000
-UI_HTTP_FILE_MAX_DIGITS = int(os.environ.get("UI_HTTP_FILE_MAX_DIGITS", "10000000"))
+# Max chars accepted from the textarea (num1). Files whose full content fits within
+# this limit can be edited in the Input Number panel before calculating.
+# Files larger than this are always loaded fresh from disk.
+# Set to 0 to disable textarea input entirely (always load from disk).
+HTTP_CHAR_LIMIT = int(os.environ.get("HTTP_CHAR_LIMIT", "10000"))
 
 # Minimum input length (digit count) for a run to qualify for the leaderboard.
 # Override at startup: LEADERBOARD_MIN_INPUT=1000000000

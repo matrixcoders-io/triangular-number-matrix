@@ -975,6 +975,21 @@ body {
   box-shadow: 0 0 10px var(--green-glow);
 }
 
+.btn-input-stepper {
+  font-size: 1.3rem;
+  padding: 6px 14px;
+}
+
+.input-digit-count {
+  width: 100%;
+  flex: 0 0 auto;
+  text-align: center;
+  padding: 4px 6px;
+  -moz-appearance: textfield;
+}
+.input-digit-count::-webkit-inner-spin-button,
+.input-digit-count::-webkit-outer-spin-button { -webkit-appearance: none; }
+
 .increment-step {
   min-width: 36px;
   max-width: 80px;
