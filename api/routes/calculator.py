@@ -356,6 +356,7 @@ def handle_big_number_math(request_type: str):
         repdigit=tpl_repdigit,
         file_names=file_names,
         ui_file_generate_enabled=UI_FILE_GENERATE_ENABLED,
+        http_char_limit=HTTP_CHAR_LIMIT,
         default_file=None,
     )
 
@@ -406,6 +407,7 @@ def index():
                 repdigit=num1[0] if num1 else "",
                 file_names=file_names,
                 ui_file_generate_enabled=UI_FILE_GENERATE_ENABLED,
+        http_char_limit=HTTP_CHAR_LIMIT,
                 default_file=default_filename,
             )
         except Exception as e:

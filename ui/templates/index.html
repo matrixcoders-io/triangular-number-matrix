@@ -32,7 +32,7 @@
             </span><span id="input-file-badge" class="input-file-badge">{% if default_file %}<span style="color:var(--text-secondary)"> · filename </span><span style="color:var(--green)">◫</span> <strong style="color:var(--text-primary);font-weight:600">{{ default_file }}</strong>{% endif %}</span>
           </span>
         </div>
-        <div style="display:flex; align-items:flex-start; gap:6px;">
+        <div style="display:flex; align-items:stretch; gap:6px;">
           <textarea
             class="number-textarea"
             name="num1"
@@ -41,9 +41,13 @@
             rows="5"
             style="flex:1; width:auto;"
           >{{ num1 or '' }}</textarea>
-          <div style="display:flex; flex-direction:column; gap:4px;">
-            <button type="button" id="btn-input-inc" class="btn-stepper" title="Append last digit to Input Number">+</button>
-            <button type="button" id="btn-input-dec" class="btn-stepper" title="Remove last digit from Input Number">−</button>
+          <div style="display:flex; flex-direction:column; justify-content:space-between; align-items:stretch;">
+            <button type="button" id="btn-input-inc" class="btn-stepper btn-input-stepper" title="Append last digit">+</button>
+            <input type="number" id="input-digit-count"
+                   class="input-control input-digit-count"
+                   min="1" max="{{ http_char_limit }}"
+                   value="0" title="Digit count — type to resize Input Number">
+            <button type="button" id="btn-input-dec" class="btn-stepper btn-input-stepper" title="Remove last digit">−</button>
           </div>
         </div>
 

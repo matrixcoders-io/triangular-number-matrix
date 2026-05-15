@@ -604,7 +604,7 @@ function renderWindowContent(text) {
  *    [pN-1 pN] ···gap··· [q1 q2]
  *  [pN-2..pN]  ···gap···  [q1..q3]
  */
-const MAX_PYRAMID_ROWS = 10;
+// No hard cap on pyramid rows — cap is min(N, M) so the pyramid grows with the input.
 
 /**
  * Char-by-char comparison: wraps matching chars in a colored span, leaves non-matching as plain text.
@@ -718,11 +718,16 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   // Look up lc prefix length for this digit family (digits 5, 7, 9 have a 1-char lc prefix).
   // lcLen comes from MATRIX (structural constant); lcStr is read from text so it stays
   // correct even when a large increment carries into the leading digit (e.g. '4' → '5').
-  let lcLen = 0;
+  let lcLen  = 0;
+  let lcBase = ''; // MATRIX base value — what a pure repdigit (no increment) starts with
   for (const data of Object.values(MATRIX)) {
-    if (data.hpl === hpl) { lcLen = data.lc ? data.lc.length : 0; break; }
+    if (data.hpl === hpl) {
+      lcLen  = data.lc ? data.lc.length : 0;
+      lcBase = data.lc || '';
+      break;
+    }
   }
-  const lcStr = text.slice(0, lcLen);
+  const lcStr = text.slice(0, lcLen); // actual current leading chars (correct after any increment)
 
   // Find vpcIdx with tile-alignment verification (rejects coincidental matches in changed zones).
   let vpcIdx      = findBestVpcIdx(text, vpcVal, hpl);
@@ -790,7 +795,10 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   // cap = max rows to show. gapCol = column where VPC starts in every row.
   // Row k text widths: left = k*tileHplLen + leftRemLen, right = rightRemLen + k*tileHprLen.
   // leftPad = gapCol - (k*tileHplLen + leftRemLen) = (cap-k)*tileHplLen  (purely arithmetic).
-  const cap    = Math.min(N, M, MAX_PYRAMID_ROWS);
+  // Rows capped so pyramid visual footprint ≈ Standard mode's char count.
+  // sqrt(text.length / tileHplLen) gives O(text.length) total visual chars,
+  // matching Standard mode's display size while still scaling with input length.
+  const cap    = Math.min(N, M, Math.max(3, Math.round(Math.sqrt(text.length / tileHplLen))));
   if (cap === 0) return null;
   const gapCol = lcLen + cap * tileHplLen + leftRemLen;  // column where VPC starts
 
@@ -897,10 +905,21 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
     lines.push(leftPad + lcPrefix + leftContent + ' '.repeat(vpcLen) + rightContent);
   }
 
-  // Integrity check: compare pyramid's assembled TN start against text.
-  // lcStr is the only non-text-derived value; a mismatch means the pyramid shows
-  // a wrong character (e.g. lc digit stale after an increment carry).
+  // Integrity check: detect large-increment leading-digit carry and tile alignment errors.
   const mismatches = [];
+
+  // Carry detection: compare actual leading chars (lcStr, from text) against the MATRIX
+  // base value (lcBase) for this digit family. They differ when a large increment causes
+  // a carry that changes the leading digit (e.g. digit 9 base '4' → incremented '5').
+  // Pyramid is correct — lcStr is derived from text — but banner informs the user.
+  if (lcLen > 0 && lcStr !== lcBase) {
+    mismatches.push(
+      'pos 0: base repdigit starts with \'' + lcBase +
+      '\', result starts with \'' + lcStr + '\' (large increment carry)'
+    );
+  }
+
+  // Tile-alignment check: pyramid left tiles must match the corresponding text substring.
   const pyramidLeft = lcStr + leftFull.slice(0, cap).join('');
   const expectedLeft = text.slice(0, lcLen + cap * tileHplLen);
   for (let i = 0; i < pyramidLeft.length; i++) {
@@ -1076,7 +1095,18 @@ async function loadWindow(offset) {
  */
 function onResultSwap() {
   const fullEl = document.getElementById('result-full');
-  if (!fullEl) return;
+  if (!fullEl) {
+    // Error or placeholder response — clear stale display rather than leaving old result.
+    _resultFull       = '';
+    _resultLength     = 0;
+    _resultTotalChars = 0;
+    _totalPages       = 0;
+    _currentPage      = 1;
+    _windowOffset     = 0;
+    const display = document.getElementById('number-display');
+    if (display) display.textContent = '';
+    return;
+  }
 
   _lastResultOperation = document.getElementById('operation')?.value || '';
   const _fhEl = document.getElementById('file-name-hidden');
@@ -1256,12 +1286,21 @@ function initIncrementSteppers() {
 }
 
 function initInputDigitSteppers() {
-  const ta = document.getElementById('number-input');
+  const ta      = document.getElementById('number-input');
+  const countEl = document.getElementById('input-digit-count');
+  const maxDigits = parseInt(countEl?.getAttribute('max') || '10000', 10);
+
+  function syncCount() {
+    if (countEl) countEl.value = ta ? ta.value.length : 0;
+  }
+
+  ta?.addEventListener('input', syncCount);
+  syncCount();
 
   document.getElementById('btn-input-inc')?.addEventListener('click', () => {
     if (!ta || !ta.value.trim()) return;
-    const lastChar = ta.value[ta.value.length - 1];
-    ta.value = ta.value + lastChar;
+    if (ta.value.length >= maxDigits) return;
+    ta.value = ta.value + ta.value[ta.value.length - 1];
     ta.dispatchEvent(new Event('input'));
     document.querySelector('.btn-calculate')?.click();
   });
@@ -1269,6 +1308,52 @@ function initInputDigitSteppers() {
   document.getElementById('btn-input-dec')?.addEventListener('click', () => {
     if (!ta || ta.value.length === 0) return;
     ta.value = ta.value.slice(0, -1);
+    ta.dispatchEvent(new Event('input'));
+    if (ta.value.trim().length > 0) {
+      document.querySelector('.btn-calculate')?.click();
+    }
+  });
+
+  // Enter key: prevent native form submit (race condition) and execute resize+calculate inline.
+  // Using keydown+preventDefault stops the browser's composite "commit+submit" action.
+  // We then re-implement the resize logic here so Enter always works, even when target
+  // equals current length. The change handler still fires on blur for non-Enter commits.
+  countEl?.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault(); // stop native form submit with stale textarea
+    if (!ta) return;
+    let target = parseInt(countEl.value, 10);
+    if (isNaN(target) || target < 1) { countEl.value = ta.value.length; return; }
+    target = Math.min(target, maxDigits);
+    countEl.value = target;
+    const cur = ta.value;
+    if (target < cur.length) {
+      ta.value = cur.slice(0, target);
+      ta.dispatchEvent(new Event('input'));
+    } else if (target > cur.length && cur.length > 0) {
+      ta.value = cur + cur[cur.length - 1].repeat(target - cur.length);
+      ta.dispatchEvent(new Event('input'));
+    }
+    if (ta.value.trim().length > 0) document.querySelector('.btn-calculate')?.click();
+  });
+
+  countEl?.addEventListener('change', () => {
+    if (!ta) return;
+    let target = parseInt(countEl.value, 10);
+    if (isNaN(target) || target < 1) { countEl.value = ta.value.length; return; }
+    target = Math.min(target, maxDigits);
+    countEl.value = target;
+
+    const current = ta.value;
+    if (target === current.length) return;
+
+    if (target < current.length) {
+      ta.value = current.slice(0, target);
+    } else {
+      if (!current.length) return;
+      ta.value = current + current[current.length - 1].repeat(target - current.length);
+    }
+
     ta.dispatchEvent(new Event('input'));
     if (ta.value.trim().length > 0) {
       document.querySelector('.btn-calculate')?.click();
