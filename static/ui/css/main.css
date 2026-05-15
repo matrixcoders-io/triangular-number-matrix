@@ -48,6 +48,11 @@
   --green-glow:   rgba(52, 211, 153, 0.18);
   --green-dim:    rgba(52, 211, 153, 0.07);
 
+  /* Digital Root */
+  --dr:      #cc4520;
+  --dr-dim:  rgba(204, 69, 32, 0.10);
+  --dr-glow: rgba(204, 69, 32, 0.18);
+
   /* Status */
   --red:    #f87171;
   --amber:  #fbbf24;
@@ -683,7 +688,7 @@ body {
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--green);
+  color: var(--dr);
 }
 
 /* VPC grid */
@@ -704,7 +709,7 @@ body {
 
 .vpc-label {
   font-size: 0.72rem;
-  color: var(--green);
+  color: var(--dr);
   font-family: var(--font-mono);
   font-weight: 700;
   margin-bottom: 3px;
@@ -819,7 +824,7 @@ body {
 .active-indicator-value { color: var(--red); font-family: var(--font-mono); font-weight: 700; font-size: 1rem; }
 
 /* Digital Root value — green, the number 1–9 that selected this constant */
-.active-dr-value { color: var(--green); font-family: var(--font-mono); font-weight: 700; font-size: 1rem; }
+.active-dr-value { color: var(--dr); font-family: var(--font-mono); font-weight: 700; font-size: 1rem; }
 
 /* ============================================================
    RESULT PANEL
@@ -1435,3 +1440,42 @@ body {
 
 /* Lock body scroll behind the overlay */
 body.panel-expanded-active { overflow: hidden; }
+
+/* ── Run History inline controls (visible only when panel is expanded) ── */
+.panel-header-controls {
+  display: none;
+  align-items: center;
+  gap: 8px;
+}
+.panel.panel-expanded .panel-header-controls {
+  display: flex;
+}
+
+/* Compact control variants for use inside panel header */
+.btn-stepper-sm {
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 0 9px;
+  height: 30px;
+}
+.increment-step-sm {
+  width: 38px;
+  height: 30px;
+  font-size: 0.75rem;
+}
+.input-control-sm {
+  height: 30px;
+  padding: 4px 8px;
+  font-size: 0.82rem;
+  width: 130px;
+  border-radius: var(--radius-sm);
+}
+.select-control-sm {
+  height: 30px;
+  padding: 4px 28px 4px 8px;
+  font-size: 0.78rem;
+  min-width: 150px;
+  border-radius: var(--radius-sm);
+  background-size: 10px;
+  background-position: right 8px center;
+}

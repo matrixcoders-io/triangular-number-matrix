@@ -199,6 +199,23 @@
       <button class="panel-tab active" id="tab-history" type="button">⟳ Run History</button>
       <button class="panel-tab" id="tab-leaderboard" type="button">⊕ Leader Board</button>
     </div>
+    <div class="panel-header-controls" id="history-inline-controls">
+      <div style="display:flex; align-items:stretch; gap:3px;">
+        <button type="button" id="btn-inc-dec-rh" class="btn-stepper btn-stepper-sm">−</button>
+        <input type="number" id="inc-step-rh" class="increment-step increment-step-sm" value="10" min="1" title="Step size">
+        <input type="text" id="num2-rh" class="input-control input-control-sm" placeholder="0" style="text-align:center;">
+        <input type="number" id="inc-step-rh-r" class="increment-step increment-step-sm" value="10" min="1" title="Step size">
+        <button type="button" id="btn-inc-inc-rh" class="btn-stepper btn-stepper-sm">+</button>
+      </div>
+      <select id="operation-rh" class="select-control select-control-sm">
+        <option value="tri_matrix">Matrix (in-memory)</option>
+        <option value="tri_matrix_memory">Matrix Memory (chunked)</option>
+        <option value="tri_matrix_stream">Matrix Stream (disk write)</option>
+        <option value="tri_matrix_random">Matrix Random (shortform)</option>
+        <option value="tri_div_gmpy2_formula">Division gmpy2</option>
+        <option value="tri_div_simpy_formula">Division sympy</option>
+      </select>
+    </div>
     <div class="panel-header-actions">
       <button class="btn-close-panel btn-nav" type="button" title="Close expanded view">✕</button>
       <button class="btn-expand btn-nav" type="button" data-panel="panel-history" title="Expand">⤢</button>

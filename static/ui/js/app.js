@@ -1280,6 +1280,52 @@ function initIncrementSteppers() {
   document.getElementById('btn-increment-inc')?.addEventListener('click', () => step(1));
 }
 
+function initHistoryInlineControls() {
+  const mainNum2 = document.getElementById('num2');
+  const mainOp   = document.getElementById('operation');
+  const rhNum2   = document.getElementById('num2-rh');
+  const rhOp     = document.getElementById('operation-rh');
+  const rhStep   = document.getElementById('inc-step-rh');
+  const rhStepR  = document.getElementById('inc-step-rh-r');
+
+  if (!rhNum2 || !rhOp || !mainNum2 || !mainOp) return;
+
+  // Keep both RH step inputs in sync with each other
+  rhStep?.addEventListener('input',  () => { if (rhStepR) rhStepR.value = rhStep.value; });
+  rhStepR?.addEventListener('input', () => { if (rhStep)  rhStep.value  = rhStepR.value; });
+
+  // Initialise RH controls to match current main form values
+  rhNum2.value = mainNum2.value;
+  rhOp.value   = mainOp.value;
+
+  // Sync: RH → main (user interacts with the header controls)
+  rhNum2.addEventListener('input',  () => { mainNum2.value = rhNum2.value; });
+  rhOp.addEventListener('change',   () => {
+    mainOp.value = rhOp.value;
+    document.querySelector('.btn-calculate')?.click();
+  });
+
+  // Sync: main → RH (keeps header display current after normal-view increments)
+  mainNum2.addEventListener('input', () => { rhNum2.value = mainNum2.value; });
+  mainOp.addEventListener('change',  () => { rhOp.value   = mainOp.value; });
+
+  function getStep() {
+    const s = parseInt(rhStep?.value, 10);
+    return (isNaN(s) || s < 1) ? 10 : s;
+  }
+
+  function rhStepFn(sign) {
+    const current  = parseInt(rhNum2.value, 10);
+    const newVal   = (isNaN(current) ? 0 : current) + sign * getStep();
+    rhNum2.value   = newVal;
+    mainNum2.value = newVal;
+    document.querySelector('.btn-calculate')?.click();
+  }
+
+  document.getElementById('btn-inc-dec-rh')?.addEventListener('click', () => rhStepFn(-1));
+  document.getElementById('btn-inc-inc-rh')?.addEventListener('click', () => rhStepFn(1));
+}
+
 /* ============================================================
    INIT
    ============================================================ */
@@ -1293,6 +1339,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initCopyButton();
   initPatternToggles();
   initIncrementSteppers();
+  initHistoryInlineControls();
   colorizeMethodBadges();
 
   // Wire up number textarea
