@@ -10,7 +10,7 @@ import logging
 
 from flask import Blueprint, request, jsonify, abort
 
-from config import NUMBERS_DIR, UI_HTTP_FILE_TRANSFER, UI_HTTP_FILE_MAX_DIGITS, UI_FILE_GENERATE_ENABLED
+from config import NUMBERS_DIR, UI_FILE_GENERATE_ENABLED
 
 logger = logging.getLogger(__name__)
 
@@ -93,11 +93,7 @@ def preview_file():
     Return the first PREVIEW_CAP digits of a number file for textarea display.
     Adds X-File-Digits and X-Preview-Truncated headers so the browser can show
     a truncation note without loading the full file into memory.
-    Returns 403 if HTTP transfer is disabled in config.
     """
-    if not UI_HTTP_FILE_TRANSFER:
-        return "HTTP file transfer is disabled.", 403
-
     name = request.args.get("name", "").strip()
     if not name or "/" in name or "\\" in name:
         abort(400)

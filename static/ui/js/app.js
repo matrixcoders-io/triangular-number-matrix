@@ -279,12 +279,8 @@ function initDigitSelector() {
 }
 
 /* ============================================================
-   FILE MODE — disk-direct vs http transfer
+   FILE MODE — file_names hidden field for large-file disk fallback
    ============================================================ */
-function getFileMode() {
-  const checked = document.querySelector('input[name="ui_file_mode"]:checked');
-  return checked ? checked.value : 'disk';
-}
 
 function setDiskHiddenField(filename) {
   const hidden = document.getElementById('file-name-hidden');
@@ -295,20 +291,14 @@ function setDiskHiddenField(filename) {
   if (indicator) indicator.style.display = filename ? 'block' : 'none';
 }
 
-function clearDiskHiddenField() {
-  setDiskHiddenField('');
-  const badge = document.getElementById('input-file-badge');
-  if (badge) badge.textContent = '';
-}
-
 /* ============================================================
    FILE LOADER — shared by file browser Use buttons and digit selector
    ============================================================ */
 
 /**
  * Load a number file: mark it selected in the UI, update Number Family,
- * set the disk hidden field (disk mode) or fetch content into textarea.
- * Returns a Promise that resolves when the textarea is populated.
+ * set the disk hidden field (for large-file fallback), and fetch the
+ * preview into the textarea.
  */
 async function loadFile(filename) {
   if (!filename) return;
@@ -339,15 +329,11 @@ async function loadFile(filename) {
     }
   }
 
-  const mode = getFileMode();
-  if (mode === 'disk') {
-    setDiskHiddenField(filename);
-  } else {
-    clearDiskHiddenField();
-  }
+  // Always record the filename so backend can fall back to disk for large files.
+  setDiskHiddenField(filename);
 
   const ta = document.getElementById('number-input');
-  if (ta) ta.value = mode === 'disk' ? 'Loading preview…' : 'Loading…';
+  if (ta) ta.value = 'Loading…';
 
   try {
     const resp = await fetch(`${BASE_PATH}/files/preview?name=${encodeURIComponent(filename)}`);
@@ -361,39 +347,26 @@ async function loadFile(filename) {
         if (truncated) {
           const metaEl = document.getElementById('input-char-count');
           if (metaEl) metaEl.textContent =
-            `${totalDigits.toLocaleString()} digits · showing first ${INPUT_DISPLAY_CAP.toLocaleString()}`;
+            `${totalDigits.toLocaleString()} digits · showing first ${INPUT_DISPLAY_CAP.toLocaleString()} · full file read on Calculate`;
         }
       }
     } else {
-      if (mode === 'disk' && ta) {
+      if (ta) {
         ta.value = '';
-        ta.placeholder = `[Disk-Direct] ${filename} — content will be read from server on Calculate`;
-      } else if (ta) {
-        const msg = await resp.text();
-        ta.value = '';
-        alert(`Could not load file over HTTP:\n${msg}`);
+        ta.placeholder = `${filename} — full content will be read from server on Calculate`;
       }
     }
   } catch (_) {
-    if (ta) { ta.value = ''; ta.placeholder = `[Disk-Direct] ${filename}`; }
+    if (ta) { ta.value = ''; ta.placeholder = filename; }
   }
 }
 
 /* ============================================================
-   FILE BROWSER — "Use" button, mode-aware
+   FILE BROWSER — "Use" button
    ============================================================ */
 function initFileBrowser() {
   document.querySelectorAll('.btn-use').forEach(btn => {
     btn.addEventListener('click', () => loadFile(btn.dataset.filename));
-  });
-
-  // When user switches modes, clear disk hidden field (keep textarea content)
-  document.querySelectorAll('input[name="ui_file_mode"]').forEach(radio => {
-    radio.addEventListener('change', () => {
-      clearDiskHiddenField();
-      document.querySelectorAll('.file-table tr.selected').forEach(r => r.classList.remove('selected'));
-      document.querySelectorAll('.btn-use.active').forEach(b => b.classList.remove('active'));
-    });
   });
 }
 
@@ -1282,6 +1255,27 @@ function initIncrementSteppers() {
   document.getElementById('btn-increment-inc')?.addEventListener('click', () => step(1));
 }
 
+function initInputDigitSteppers() {
+  const ta = document.getElementById('number-input');
+
+  document.getElementById('btn-input-inc')?.addEventListener('click', () => {
+    if (!ta || !ta.value.trim()) return;
+    const lastChar = ta.value[ta.value.length - 1];
+    ta.value = ta.value + lastChar;
+    ta.dispatchEvent(new Event('input'));
+    document.querySelector('.btn-calculate')?.click();
+  });
+
+  document.getElementById('btn-input-dec')?.addEventListener('click', () => {
+    if (!ta || ta.value.length === 0) return;
+    ta.value = ta.value.slice(0, -1);
+    ta.dispatchEvent(new Event('input'));
+    if (ta.value.trim().length > 0) {
+      document.querySelector('.btn-calculate')?.click();
+    }
+  });
+}
+
 function initHistoryInlineControls() {
   const mainNum2 = document.getElementById('num2');
   const mainOp   = document.getElementById('operation');
@@ -1342,6 +1336,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initPatternToggles();
   initIncrementSteppers();
   initHistoryInlineControls();
+  initInputDigitSteppers();
   colorizeMethodBadges();
 
   // Wire up number textarea

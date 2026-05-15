@@ -22,10 +22,8 @@
         hx-swap="innerHTML"
         hx-indicator=".btn-calculate"
       >
-        {# Hidden field carries selected filename for disk-direct mode #}
+        {# Hidden field carries selected filename so backend can load from disk when textarea exceeds HTTP_CHAR_LIMIT #}
         <input type="hidden" name="file_names" id="file-name-hidden" value="">
-        {# Mirrors the current file_mode radio selection into the form POST #}
-        <input type="hidden" name="file_mode"  id="file-mode-hidden" value="disk">
 
         <div class="input-label">
           <span>Input Number
@@ -34,13 +32,20 @@
             </span><span id="input-file-badge" class="input-file-badge">{% if default_file %}<span style="color:var(--text-secondary)"> · filename </span><span style="color:var(--green)">◫</span> <strong style="color:var(--text-primary);font-weight:600">{{ default_file }}</strong>{% endif %}</span>
           </span>
         </div>
-        <textarea
-          class="number-textarea"
-          name="num1"
-          id="number-input"
-          placeholder="Paste a repdigit number — or click Use in the File Library below…"
-          rows="5"
-        >{{ num1 or '' }}</textarea>
+        <div style="display:flex; align-items:flex-start; gap:6px;">
+          <textarea
+            class="number-textarea"
+            name="num1"
+            id="number-input"
+            placeholder="Paste a repdigit number — or click Use in the File Library below…"
+            rows="5"
+            style="flex:1; width:auto;"
+          >{{ num1 or '' }}</textarea>
+          <div style="display:flex; flex-direction:column; gap:4px;">
+            <button type="button" id="btn-input-inc" class="btn-stepper" title="Append last digit to Input Number">+</button>
+            <button type="button" id="btn-input-dec" class="btn-stepper" title="Remove last digit from Input Number">−</button>
+          </div>
+        </div>
 
         <div class="calc-bottom-row">
           <div class="form-group" style="flex: 2; min-width: 0;">
@@ -354,72 +359,12 @@
 </div>
 
 
-{# ══════════════════════════════════════════════════════════════════
-   FILE INPUT MODE (configuration, below Lab)
-   Only shown if HTTP transfer is enabled in startup config.
-   ══════════════════════════════════════════════════════════════════ #}
-<div class="panel">
-  <div class="panel-header">
-    <span class="panel-title"><span class="panel-title-icon">⚙</span>File Input Mode</span>
-    <span class="panel-subtitle">Controls how "Use" loads files — configurable at startup via env vars</span>
-  </div>
-  <div class="panel-body">
-    <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-start;">
-
-      <label class="file-mode-option" style="flex:1; min-width:180px;">
-        <input type="radio" name="ui_file_mode" value="disk" id="mode-disk" checked>
-        <span class="file-mode-text">
-          <span class="file-mode-name">Disk-Direct</span>
-          <span class="file-mode-desc">Flask reads from server disk on Calculate — no size limit, file content shown as preview only</span>
-        </span>
-      </label>
-
-      {% if ui_http_enabled %}
-      <label class="file-mode-option" style="flex:1; min-width:180px;">
-        <input type="radio" name="ui_file_mode" value="http" id="mode-http">
-        <span class="file-mode-text">
-          <span class="file-mode-name">HTTP Transfer</span>
-          <span class="file-mode-desc">File content sent to browser on Use — max {{ '{:,}'.format(ui_http_max_digits) }} digits<br>
-            <span style="color:var(--text-muted);">Disable at startup: <code style="font-size:0.68rem;">UI_HTTP_FILE_TRANSFER=false</code></span>
-          </span>
-        </span>
-      </label>
-      {% else %}
-      <div style="font-size:0.78rem; color:var(--text-muted); align-self:center;">
-        HTTP transfer disabled — set <code style="font-size:0.75rem;">UI_HTTP_FILE_TRANSFER=true</code> at startup to enable.
-      </div>
-      {% endif %}
-
-    </div>
-
-    <div style="margin-top:10px; font-size:0.72rem; color:var(--text-muted); line-height:1.6;">
-      Startup env vars:
-      <code style="color:var(--cyan);">UI_HTTP_FILE_TRANSFER=true|false</code> &nbsp;·&nbsp;
-      <code style="color:var(--cyan);">UI_HTTP_FILE_MAX_DIGITS=10000000</code>
-    </div>
-  </div>
-</div>
-
 {% endblock %}
 
 
 {% block scripts_extra %}
 <script>
   const FILE_GENERATE_ENABLED = {{ 'true' if ui_file_generate_enabled else 'false' }};
-
-  // ── Sync the ui_file_mode radio into the form hidden field ──────
-  // The calculator form uses #file-mode-hidden (not the radio directly,
-  // since the radio is outside the form).
-  document.querySelectorAll('input[name="ui_file_mode"]').forEach(function(radio) {
-    radio.addEventListener('change', function() {
-      var hidden = document.getElementById('file-mode-hidden');
-      if (hidden) hidden.value = this.value;
-      // clearDiskHiddenField is defined in app.js
-      if (this.value === 'http' && typeof clearDiskHiddenField === 'function') {
-        clearDiskHiddenField();
-      }
-    });
-  });
 
   // ── Tab switcher: Run History / Leader Board ────────────────────
   document.getElementById('tab-history')?.addEventListener('click', function() {

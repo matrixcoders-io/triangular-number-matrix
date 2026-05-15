@@ -22,8 +22,7 @@ from config import (
     WE_FILES_DIR,
     STAT_FILES_DIR,
     WINDOWS_JSON,
-    UI_HTTP_FILE_TRANSFER,
-    UI_HTTP_FILE_MAX_DIGITS,
+    HTTP_CHAR_LIMIT,
     ALLOWED_FILES,
     UI_FILE_GENERATE_ENABLED,
 )
@@ -133,14 +132,21 @@ def handle_big_number_math(request_type: str):
         num1 = request.form.get("num1", "").strip()
         num2 = request.form.get("num2", "").strip()
         operation = request.form.get("operation", "")
-        file_mode = request.form.get("file_mode", "disk")
-        file_stem = os.path.splitext(file_name)[0] if (file_mode == "disk" and file_name) else ""
-
+        # file_stem always comes from the selected filename when one exists.
+        # This ensures TN files are keyed correctly and /calc/window works,
+        # regardless of whether we use textarea or disk for num1.
+        file_stem = os.path.splitext(file_name)[0] if file_name else ""
         try:
             start_time = time.perf_counter()
 
-            # Disk-direct: read file from server, overrides textarea content
-            if file_mode == "disk" and file_name:
+            # Use textarea content when it's within the char limit; otherwise load from disk.
+            # Strict less-than ensures truncated previews (= HTTP_CHAR_LIMIT chars) go to disk.
+            use_textarea = HTTP_CHAR_LIMIT > 0 and len(num1) < HTTP_CHAR_LIMIT
+
+            if not use_textarea:
+                if not file_name:
+                    return render_template("partials/result_panel.html",
+                                           error="No input provided. Select a file or enter a number.")
                 if ".." in file_name or "/" in file_name or "\\" in file_name:
                     return render_template("partials/result_panel.html", error="Invalid file name.")
                 if ALLOWED_FILES != ["*"] and file_name not in ALLOWED_FILES:
@@ -229,7 +235,7 @@ def handle_big_number_math(request_type: str):
                 windows = [(int(a), int(bv)) for a, bv in load_windows_json(WINDOWS_JSON)]
                 _stream_res = b.repDigitTriangularNumberStream(
                     num1,
-                    out_path=_tn_file_path(operation, file_stem) if file_stem else None,
+                    out_path=_tn_file_path(operation, file_stem) if file_stem else TN_OUT_FILE + ".tri_matrix_stream.raw.txt",
                     extract_ranges=windows,
                     collect_result=True,
                 )
@@ -349,8 +355,6 @@ def handle_big_number_math(request_type: str):
         end_pattern=tpl_end_pattern,
         repdigit=tpl_repdigit,
         file_names=file_names,
-        ui_http_enabled=UI_HTTP_FILE_TRANSFER,
-        ui_http_max_digits=UI_HTTP_FILE_MAX_DIGITS,
         ui_file_generate_enabled=UI_FILE_GENERATE_ENABLED,
         default_file=None,
     )
@@ -401,8 +405,6 @@ def index():
                 end_pattern=result_str[-30:],
                 repdigit=num1[0] if num1 else "",
                 file_names=file_names,
-                ui_http_enabled=UI_HTTP_FILE_TRANSFER,
-                ui_http_max_digits=UI_HTTP_FILE_MAX_DIGITS,
                 ui_file_generate_enabled=UI_FILE_GENERATE_ENABLED,
                 default_file=default_filename,
             )
