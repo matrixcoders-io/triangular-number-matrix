@@ -5,6 +5,7 @@ Lab blueprint — pytest runner, returns streaming/collected test output.
 """
 
 import os
+import sys
 import subprocess
 import logging
 
@@ -16,7 +17,8 @@ lab_bp = Blueprint("lab", __name__)
 
 # Project root is two levels above this file
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-VENV_PYTHON  = os.path.join(PROJECT_ROOT, ".venv", "bin", "python")
+_venv_python = os.path.join(PROJECT_ROOT, ".venv", "bin", "python")
+VENV_PYTHON  = _venv_python if os.path.isfile(_venv_python) else sys.executable
 
 
 def _pytest_cmd(test_file: str | None = None) -> list:
@@ -54,7 +56,8 @@ def run_tests():
         return jsonify({"returncode": -1, "output": "Tests timed out after 120s.", "passed": 0, "failed": 0, "xfailed": 0})
     except Exception as e:
         logger.error("lab/run-tests error: %s", e)
-        return jsonify({"returncode": -1, "output": str(e), "passed": 0, "failed": 0, "xfailed": 0}), 500
+        # Return 200 so HTMX swaps the output — HTMX 1.9 silently ignores non-2xx responses
+        return jsonify({"returncode": -1, "output": str(e), "passed": 0, "failed": 0, "xfailed": 0})
 
 
 @lab_bp.route("/lab/run-tests/stream")
