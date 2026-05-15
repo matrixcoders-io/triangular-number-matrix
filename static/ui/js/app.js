@@ -743,11 +743,13 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   const tileHprLen = tileHpr.length;
 
   // Look up lc prefix length for this digit family (digits 5, 7, 9 have a 1-char lc prefix).
-  // leftFull tiles start after the lc prefix.
-  let lcLen = 0, lcStr = '';
+  // lcLen comes from MATRIX (structural constant); lcStr is read from text so it stays
+  // correct even when a large increment carries into the leading digit (e.g. '4' → '5').
+  let lcLen = 0;
   for (const data of Object.values(MATRIX)) {
-    if (data.hpl === hpl) { lcLen = data.lc ? data.lc.length : 0; lcStr = data.lc || ''; break; }
+    if (data.hpl === hpl) { lcLen = data.lc ? data.lc.length : 0; break; }
   }
+  const lcStr = text.slice(0, lcLen);
 
   // Find vpcIdx with tile-alignment verification (rejects coincidental matches in changed zones).
   let vpcIdx      = findBestVpcIdx(text, vpcVal, hpl);
