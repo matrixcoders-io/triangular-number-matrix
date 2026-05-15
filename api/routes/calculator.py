@@ -33,16 +33,20 @@ logger = logging.getLogger(__name__)
 
 calculator_bp = Blueprint("calculator", __name__)
 
-# Maps each operation name to the file path where its TN result is written.
-# /calc/window reads from this map instead of a shared canonical file.
-_METHOD_FILE_MAP = {
-    "tri_matrix":            TN_OUT_FILE + ".tri_matrix_standard.txt",
-    "tri_matrix_stream":     TN_OUT_FILE + ".tri_matrix_stream.txt",
-    "tri_matrix_memory":     TN_OUT_FILE + ".tri_matrix_memory.txt",
-    "tri_matrix_random":     TN_OUT_FILE + ".tri_matrix_random.txt",
-    "tri_div_gmpy2_formula": TN_OUT_FILE + ".tri_div_gmpy2_formula.txt",
-    "tri_div_simpy_formula": TN_OUT_FILE + ".tri_div_simpy_formula.txt",
-}
+VALID_OPERATIONS = frozenset({
+    "tri_matrix", "tri_matrix_stream", "tri_matrix_memory",
+    "tri_matrix_random", "tri_div_gmpy2_formula", "tri_div_simpy_formula",
+})
+
+
+def _tn_file_path(operation: str, file_stem: str) -> str:
+    """TN output path keyed by (operation, input-file-stem).
+
+    tri_matrix writes with suffix 'tri_matrix_standard' to match its legacy pattern.
+    All other operations use the operation name directly.
+    """
+    suffix = "tri_matrix_standard" if operation == "tri_matrix" else operation
+    return f"{TN_OUT_FILE}.{suffix}.{file_stem}.txt"
 
 
 # ---------------------------------------------------------------------------
@@ -130,6 +134,7 @@ def handle_big_number_math(request_type: str):
         num2 = request.form.get("num2", "").strip()
         operation = request.form.get("operation", "")
         file_mode = request.form.get("file_mode", "disk")
+        file_stem = os.path.splitext(file_name)[0] if (file_mode == "disk" and file_name) else ""
 
         try:
             start_time = time.perf_counter()
@@ -172,7 +177,8 @@ def handle_big_number_math(request_type: str):
                 b = TriangulaNumberMatrix("1")
                 result = b.increment_by_gmpy_count(num1, result, num2) if num2 not in (None, "", " ") else result
                 result = str(result)  # convert sympy Integer to str once — later str() calls are no-ops
-                write_to_file(TN_OUT_FILE + "." + operation + ".txt", result)
+                if file_stem:
+                    write_to_file(_tn_file_path(operation, file_stem), result)
                 write_to_file(
                     os.path.join(STAT_FILES_DIR, "stat-file.txt.tri_div_simpy_formula.txt"),
                     "{repdigit: " + str(num1[0]) +
@@ -187,7 +193,8 @@ def handle_big_number_math(request_type: str):
                 logger.info("loaded file for gmpy2 n(n+1)/2: %s s", file_load_time)
                 result = a.triangular_number_gmpy2_division(num1)
                 result = str(result)  # convert gmpy2 mpz → str once; later str() calls are no-ops
-                write_to_file(TN_OUT_FILE + "." + operation + ".txt", result)
+                if file_stem:
+                    write_to_file(_tn_file_path(operation, file_stem), result)
                 write_to_file(
                     os.path.join(STAT_FILES_DIR, "stat-file.txt.tri_div_pmpy2_formula.txt"),
                     "{repdigit: " + str(num1[0]) +
@@ -205,7 +212,8 @@ def handle_big_number_math(request_type: str):
                 b = TriangulaNumberMatrix("1")
                 logger.info("loaded file for tri_matrix: %s s", file_load_time)
                 result = b.repDigitTriangularNumber(num1)
-                write_to_file(TN_OUT_FILE + "." + operation + "_standard.txt", str(result))
+                if file_stem:
+                    write_to_file(_tn_file_path(operation, file_stem), str(result))
                 write_to_file(
                     os.path.join(STAT_FILES_DIR, "stat-file.txt.tri_matrix_standard.txt"),
                     "{repdigit: " + str(num1[0]) + ", repdigit_length: " + str(len(num1)) +
@@ -221,7 +229,7 @@ def handle_big_number_math(request_type: str):
                 windows = [(int(a), int(bv)) for a, bv in load_windows_json(WINDOWS_JSON)]
                 _stream_res = b.repDigitTriangularNumberStream(
                     num1,
-                    out_path=TN_OUT_FILE + "." + operation + ".txt",
+                    out_path=_tn_file_path(operation, file_stem) if file_stem else None,
                     extract_ranges=windows,
                     collect_result=True,
                 )
@@ -241,7 +249,8 @@ def handle_big_number_math(request_type: str):
                 logger.info("loaded file for tri_matrix_memory: %s s", file_load_time)
                 windows = [(int(a), int(bv)) for a, bv in load_windows_json(WINDOWS_JSON)]
                 _mem_res = b.repDigitTriangularNumberMemory(num1, extract_ranges=windows, collect_result=True)
-                write_to_file(os.path.join(TN_OUT_FILE + ".tri_matrix_memory.txt"), str(_mem_res.get("result", "")))
+                if file_stem:
+                    write_to_file(_tn_file_path(operation, file_stem), str(_mem_res.get("result", "")))
                 write_to_file(os.path.join(WE_FILES_DIR, "we-file.txt.tri_matrix_memory.txt"), str(_mem_res["extracted"]))
                 write_to_file(
                     os.path.join(STAT_FILES_DIR, "stat-file.txt.tri_matrix_memory.txt"),
@@ -259,7 +268,8 @@ def handle_big_number_math(request_type: str):
                 windows = [(int(a), int(bv)) for a, bv in load_windows_json(WINDOWS_JSON)]
                 sf = ShortFormBigNumber.from_ops(num1)
                 result = b.repDigitTriangularNumberRandomAccess(sf, extract_ranges=windows, collect_result=True, compressed_tn_result=False)
-                write_to_file(os.path.join(TN_OUT_FILE + ".tri_matrix_random.txt"), str(result.get("result", result.get("compressed"))))
+                if file_stem:
+                    write_to_file(_tn_file_path(operation, file_stem), str(result.get("result", result.get("compressed"))))
                 write_to_file(os.path.join(WE_FILES_DIR, "we-file.txt.tri_matrix_random.txt"), str(result["extracted"]))
                 write_to_file(
                     os.path.join(STAT_FILES_DIR, "stat-file.txt.tri_matrix_random.txt"),
@@ -418,8 +428,10 @@ def result_window():
     Return a 10 000-char window of the last calculated result.
     Used by the UI Prev/Next navigation to page through large results.
     Query params:
-      offset  — start character position (default 0)
-      length  — window size, capped at 50 000 (default 10 000)
+      offset    — start character position (default 0)
+      length    — window size, capped at 50 000 (default 10 000)
+      operation — which operation's result file to read
+      file_stem — input file stem (e.g. '1-1k') that keys the result file
     Response JSON: { chunk, total, offset, length }
     """
     try:
@@ -429,9 +441,16 @@ def result_window():
         return jsonify({"error": "Invalid offset or length"}), 400
 
     operation = request.args.get("operation", "").strip()
-    result_file = _METHOD_FILE_MAP.get(operation)
-    if not result_file:
-        return jsonify({"error": f"Unknown operation '{operation}' — run a calculation first"}), 404
+    file_stem = request.args.get("file_stem", "").strip()
+
+    if operation not in VALID_OPERATIONS:
+        return jsonify({"error": f"Unknown operation '{operation}'"}), 404
+    if not file_stem:
+        return jsonify({"error": "Windowed reading requires a file-based calculation — run a file calculation first"}), 400
+    if ".." in file_stem or "/" in file_stem or "\\" in file_stem:
+        return jsonify({"error": "Invalid file_stem"}), 400
+
+    result_file = _tn_file_path(operation, file_stem)
 
     try:
         # Use seek/read so only the requested chunk is loaded — safe for files of any size.

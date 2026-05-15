@@ -500,6 +500,26 @@ function initCollapsibles() {
   });
 }
 
+function initExpandButtons() {
+  document.querySelectorAll('.btn-expand').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const panel = document.getElementById(btn.dataset.panel);
+      if (!panel) return;
+      panel.classList.add('panel-expanded');
+      document.body.classList.add('panel-expanded-active');
+    });
+  });
+
+  document.querySelectorAll('.btn-close-panel').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const panel = btn.closest('.panel');
+      if (!panel) return;
+      panel.classList.remove('panel-expanded');
+      document.body.classList.remove('panel-expanded-active');
+    });
+  });
+}
+
 /* ============================================================
    RESULT WINDOW NAVIGATION
    Manages a client-side view into the full result string.
@@ -517,6 +537,7 @@ let _currentPage       = 1;   // 1-based page number of current window
 let _totalPages        = 0;   // total pages = ceil(_resultTotalChars / RESULT_WINDOW)
 let _displayMode       = 'pyramid';  // 'standard' | 'pyramid'
 let _lastResultOperation = '';  // operation used for the last calculation — passed to /calc/window
+let _lastResultFileStem  = '';  // input file stem (e.g. '1-1k') for the last calculation — passed to /calc/window
 
 let _highlightHpl = true;  // HPL pattern highlight toggle
 let _highlightHpr = true;  // HPR pattern highlight toggle
@@ -1041,7 +1062,11 @@ async function loadWindow(offset) {
   if (_resultTotalChars > 0 && offset >= _resultTotalChars) return;
 
   try {
-    const resp = await fetch(`${BASE_PATH}/calc/window?offset=${offset}&length=${RESULT_WINDOW}&operation=${encodeURIComponent(_lastResultOperation)}`);
+    const resp = await fetch(
+      `${BASE_PATH}/calc/window?offset=${offset}&length=${RESULT_WINDOW}` +
+      `&operation=${encodeURIComponent(_lastResultOperation)}` +
+      `&file_stem=${encodeURIComponent(_lastResultFileStem)}`
+    );
     if (!resp.ok) return;
     const data = await resp.json();
 
@@ -1079,6 +1104,8 @@ function onResultSwap() {
   if (!fullEl) return;
 
   _lastResultOperation = document.getElementById('operation')?.value || '';
+  const _fhEl = document.getElementById('file-name-hidden');
+  _lastResultFileStem = _fhEl ? _fhEl.value.replace(/\.txt$/i, '') : '';
 
   // Seed state from the server-rendered first window (up to 10 000 chars).
   _resultFull   = fullEl.textContent;
@@ -1253,6 +1280,52 @@ function initIncrementSteppers() {
   document.getElementById('btn-increment-inc')?.addEventListener('click', () => step(1));
 }
 
+function initHistoryInlineControls() {
+  const mainNum2 = document.getElementById('num2');
+  const mainOp   = document.getElementById('operation');
+  const rhNum2   = document.getElementById('num2-rh');
+  const rhOp     = document.getElementById('operation-rh');
+  const rhStep   = document.getElementById('inc-step-rh');
+  const rhStepR  = document.getElementById('inc-step-rh-r');
+
+  if (!rhNum2 || !rhOp || !mainNum2 || !mainOp) return;
+
+  // Keep both RH step inputs in sync with each other
+  rhStep?.addEventListener('input',  () => { if (rhStepR) rhStepR.value = rhStep.value; });
+  rhStepR?.addEventListener('input', () => { if (rhStep)  rhStep.value  = rhStepR.value; });
+
+  // Initialise RH controls to match current main form values
+  rhNum2.value = mainNum2.value;
+  rhOp.value   = mainOp.value;
+
+  // Sync: RH → main (user interacts with the header controls)
+  rhNum2.addEventListener('input',  () => { mainNum2.value = rhNum2.value; });
+  rhOp.addEventListener('change',   () => {
+    mainOp.value = rhOp.value;
+    document.querySelector('.btn-calculate')?.click();
+  });
+
+  // Sync: main → RH (keeps header display current after normal-view increments)
+  mainNum2.addEventListener('input', () => { rhNum2.value = mainNum2.value; });
+  mainOp.addEventListener('change',  () => { rhOp.value   = mainOp.value; });
+
+  function getStep() {
+    const s = parseInt(rhStep?.value, 10);
+    return (isNaN(s) || s < 1) ? 10 : s;
+  }
+
+  function rhStepFn(sign) {
+    const current  = parseInt(rhNum2.value, 10);
+    const newVal   = (isNaN(current) ? 0 : current) + sign * getStep();
+    rhNum2.value   = newVal;
+    mainNum2.value = newVal;
+    document.querySelector('.btn-calculate')?.click();
+  }
+
+  document.getElementById('btn-inc-dec-rh')?.addEventListener('click', () => rhStepFn(-1));
+  document.getElementById('btn-inc-inc-rh')?.addEventListener('click', () => rhStepFn(1));
+}
+
 /* ============================================================
    INIT
    ============================================================ */
@@ -1261,10 +1334,12 @@ document.addEventListener('DOMContentLoaded', () => {
   initFileBrowser();
   initFileGenerate();
   initCollapsibles();
+  initExpandButtons();
   initResultNav();
   initCopyButton();
   initPatternToggles();
   initIncrementSteppers();
+  initHistoryInlineControls();
   colorizeMethodBadges();
 
   // Wire up number textarea

@@ -43,7 +43,7 @@
         >{{ num1 or '' }}</textarea>
 
         <div class="calc-bottom-row">
-          <div class="form-group" style="flex: 1; min-width: 0;">
+          <div class="form-group" style="flex: 2; min-width: 0;">
             <div class="input-label">Increment</div>
             <div style="display:flex; align-items:stretch; gap:3px;">
               <button type="button" id="btn-increment-dec" class="btn-stepper">−</button>
@@ -191,13 +191,83 @@
 
 
 {# ══════════════════════════════════════════════════════════════════
+   RUN HISTORY / LEADER BOARD (collapsible, tabbed)
+   ══════════════════════════════════════════════════════════════════ #}
+<div class="panel" id="panel-history">
+  <div class="panel-header">
+    <div class="panel-tabs">
+      <button class="panel-tab active" id="tab-history" type="button">⟳ Run History</button>
+      <button class="panel-tab" id="tab-leaderboard" type="button">⊕ Leader Board</button>
+    </div>
+    <div class="panel-header-controls" id="history-inline-controls">
+      <div style="display:flex; align-items:stretch; gap:3px;">
+        <button type="button" id="btn-inc-dec-rh" class="btn-stepper btn-stepper-sm">−</button>
+        <input type="number" id="inc-step-rh" class="increment-step increment-step-sm" value="10" min="1" title="Step size">
+        <input type="text" id="num2-rh" class="input-control input-control-sm" placeholder="0" style="text-align:center;">
+        <input type="number" id="inc-step-rh-r" class="increment-step increment-step-sm" value="10" min="1" title="Step size">
+        <button type="button" id="btn-inc-inc-rh" class="btn-stepper btn-stepper-sm">+</button>
+      </div>
+      <select id="operation-rh" class="select-control select-control-sm">
+        <option value="tri_matrix">Matrix (in-memory)</option>
+        <option value="tri_matrix_memory">Matrix Memory (chunked)</option>
+        <option value="tri_matrix_stream">Matrix Stream (disk write)</option>
+        <option value="tri_matrix_random">Matrix Random (shortform)</option>
+        <option value="tri_div_gmpy2_formula">Division gmpy2</option>
+        <option value="tri_div_simpy_formula">Division sympy</option>
+      </select>
+    </div>
+    <div class="panel-header-actions">
+      <button class="btn-close-panel btn-nav" type="button" title="Close expanded view">✕</button>
+      <button class="btn-expand btn-nav" type="button" data-panel="panel-history" title="Expand">⤢</button>
+      <button class="collapsible-toggle btn-nav" type="button" data-target="history-body" aria-expanded="true"><span class="collapse-icon" style="display:inline-block; transition: transform 0.2s;">▼</span></button>
+    </div>
+  </div>
+  <div id="history-body">
+    <div class="panel-body" style="padding: 0;">
+
+      {# ── Run History section ── #}
+      <div id="history-section">
+        <div
+          id="history-table-wrap"
+          hx-get="/stats/history"
+          hx-trigger="load, calcDone from:body"
+          hx-swap="innerHTML"
+          style="max-height: 220px; overflow-y: auto; padding: 12px 20px;"
+        ><span style="color: var(--text-secondary); font-size: 0.82rem;">Loading…</span></div>
+      </div>
+
+      {# ── Leader Board section (hidden by default) ── #}
+      <div id="leaderboard-section" style="display:none;">
+        <div
+          id="leaderboard-table-wrap"
+          hx-get="/stats/leaderboard"
+          hx-trigger="load, calcDone from:body"
+          hx-swap="innerHTML"
+          style="max-height: 220px; overflow-y: auto; padding: 12px 20px;"
+        ><span style="color: var(--text-secondary); font-size: 0.82rem;">Loading…</span></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+{# ══════════════════════════════════════════════════════════════════
    FILE LIBRARY (scrollable)
    ══════════════════════════════════════════════════════════════════ #}
-<div class="panel">
+<div class="panel" id="panel-file-library">
   <div class="panel-header">
-    <span class="panel-title"><span class="panel-title-icon">◫</span>File Library</span>
-    <span class="panel-subtitle">{{ file_names | length }} files · click Use to load</span>
+    <div>
+      <span class="panel-title"><span class="panel-title-icon">◫</span>File Library</span>
+      <span class="panel-subtitle">{{ file_names | length }} files · click Use to load</span>
+    </div>
+    <div class="panel-header-actions">
+      <button class="btn-close-panel btn-nav" type="button" title="Close expanded view">✕</button>
+      <button class="btn-expand btn-nav" type="button" data-panel="panel-file-library" title="Expand">⤢</button>
+      <button class="collapsible-toggle btn-nav" type="button" data-target="file-library-body" aria-expanded="true"><span class="collapse-icon" style="display:inline-block; transition: transform 0.2s;">▼</span></button>
+    </div>
   </div>
+  <div id="file-library-body">
   <div class="panel-body" style="padding: 0;">
     <div style="max-height: 290px; overflow-y: auto;">
       <table class="file-table">
@@ -234,51 +304,6 @@
       </table>
     </div>
   </div>
-</div>
-
-
-{# ══════════════════════════════════════════════════════════════════
-   RUN HISTORY / LEADER BOARD (collapsible, tabbed)
-   ══════════════════════════════════════════════════════════════════ #}
-<div class="panel">
-  <div class="panel-header">
-    <div class="panel-tabs">
-      <button class="panel-tab active" id="tab-history" type="button">⟳ Run History</button>
-      <button class="panel-tab" id="tab-leaderboard" type="button">⊕ Leader Board</button>
-    </div>
-    <button
-      class="collapsible-toggle btn-nav"
-      type="button"
-      data-target="history-body"
-      aria-expanded="true"
-    ><span class="collapse-icon" style="display:inline-block; transition: transform 0.2s;">▼</span></button>
-  </div>
-  <div id="history-body">
-    <div class="panel-body" style="padding: 0;">
-
-      {# ── Run History section ── #}
-      <div id="history-section">
-        <div
-          id="history-table-wrap"
-          hx-get="/stats/history"
-          hx-trigger="load, calcDone from:body"
-          hx-swap="innerHTML"
-          style="max-height: 220px; overflow-y: auto; padding: 12px 20px;"
-        ><span style="color: var(--text-secondary); font-size: 0.82rem;">Loading…</span></div>
-      </div>
-
-      {# ── Leader Board section (hidden by default) ── #}
-      <div id="leaderboard-section" style="display:none;">
-        <div
-          id="leaderboard-table-wrap"
-          hx-get="/stats/leaderboard"
-          hx-trigger="load, calcDone from:body"
-          hx-swap="innerHTML"
-          style="max-height: 220px; overflow-y: auto; padding: 12px 20px;"
-        ><span style="color: var(--text-secondary); font-size: 0.82rem;">Loading…</span></div>
-      </div>
-
-    </div>
   </div>
 </div>
 
@@ -286,7 +311,7 @@
 {# ══════════════════════════════════════════════════════════════════
    LAB — Test Suite (collapsible)
    ══════════════════════════════════════════════════════════════════ #}
-<div class="panel">
+<div class="panel" id="panel-lab">
   <div class="panel-header">
     <span class="panel-title"><span class="panel-title-icon">⚗</span>Lab — Test Suite</span>
     <div style="display:flex; gap:10px; align-items:center;">
@@ -299,6 +324,8 @@
         hx-indicator="#lab-spinner"
       >▶ Run Tests</button>
       <span id="lab-spinner" class="htmx-indicator" style="color: var(--cyan); font-size: 0.8rem;">running…</span>
+      <button class="btn-close-panel btn-nav" type="button" title="Close expanded view">✕</button>
+      <button class="btn-expand btn-nav" type="button" data-panel="panel-lab" title="Expand">⤢</button>
       <button
         class="collapsible-toggle btn-nav"
         type="button"
