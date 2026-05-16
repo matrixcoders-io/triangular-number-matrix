@@ -41,3 +41,7 @@ LEADERBOARD_MIN_INPUT = int(os.environ.get("LEADERBOARD_MIN_INPUT", "4000000000"
 # Set UI_FILE_GENERATE_ENABLED=true at startup to enable the Generate button in File Library.
 # When enabled, ALL files in NUMBERS_DIR are accepted by the calculator (ALLOWED_FILES bypassed).
 UI_FILE_GENERATE_ENABLED = os.environ.get("UI_FILE_GENERATE_ENABLED", "false").lower() == "true"
+
+# Maximum allowed absolute value for the num2 increment field.
+# Override at startup: MAX_INCREMENT=500000
+MAX_INCREMENT = int(os.environ.get("MAX_INCREMENT", "100000"))

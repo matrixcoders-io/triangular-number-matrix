@@ -48,6 +48,11 @@ echo "      done"
 # ── [2/7] nginx config ─────────────────────────────────────────────────────────
 echo "[2/7] Writing nginx config..."
 cat > /etc/nginx/conf.d/calculator.conf <<NGINX
+# Rate-limit zones — valid here because conf.d/ is included inside nginx's http {} block
+# SEC-05: protect heavy compute endpoints from abuse
+limit_req_zone \$binary_remote_addr zone=tnm_calc:10m rate=5r/m;
+limit_req_zone \$binary_remote_addr zone=tnm_lab:10m  rate=1r/m;
+
 server {
     listen 80;
     server_name ${DOMAIN};
@@ -57,7 +62,54 @@ server {
         return 302 /tnm-calculator/;
     }
 
-    # Strip /tnm-calculator prefix, proxy to Flask, rewrite HTML paths back
+    # SEC-03 / SEC-04: block external access to stats write endpoints
+    # Only localhost (deploy scripts, admin) can call these
+    location /tnm-calculator/stats/history/clear {
+        allow 127.0.0.1;
+        deny  all;
+        proxy_pass http://127.0.0.1:${FLASK_PORT}/stats/history/clear;
+        proxy_set_header Host \$host;
+    }
+    location /tnm-calculator/stats/history/append {
+        allow 127.0.0.1;
+        deny  all;
+        proxy_pass http://127.0.0.1:${FLASK_PORT}/stats/history/append;
+        proxy_set_header Host \$host;
+    }
+
+    # SEC-05: rate-limit the calculation endpoint (5 req/min per IP, burst 3)
+    location /tnm-calculator/calc {
+        limit_req        zone=tnm_calc burst=3 nodelay;
+        limit_req_status 429;
+        proxy_pass          http://127.0.0.1:${FLASK_PORT}/calc;
+        proxy_set_header    Host              \$host;
+        proxy_set_header    X-Real-IP         \$remote_addr;
+        proxy_set_header    X-Forwarded-For   \$proxy_add_x_forwarded_for;
+        proxy_set_header    X-Forwarded-Proto \$scheme;
+        proxy_read_timeout  300;
+        proxy_buffering     off;
+        proxy_set_header    Accept-Encoding   "";
+        sub_filter_once  off;
+        sub_filter 'action="/'   'action="/tnm-calculator/';
+        sub_filter 'href="/'     'href="/tnm-calculator/';
+        sub_filter 'src="/'      'src="/tnm-calculator/';
+        sub_filter 'hx-get="/'  'hx-get="/tnm-calculator/';
+        sub_filter 'hx-post="/' 'hx-post="/tnm-calculator/';
+        sub_filter 'hx-put="/'  'hx-put="/tnm-calculator/';
+    }
+
+    # SEC-05: rate-limit the lab test runner (1 req/min per IP — spawns subprocess)
+    location /tnm-calculator/lab/run-tests {
+        limit_req        zone=tnm_lab burst=1 nodelay;
+        limit_req_status 429;
+        proxy_pass          http://127.0.0.1:${FLASK_PORT}/lab/run-tests;
+        proxy_set_header    Host              \$host;
+        proxy_set_header    X-Real-IP         \$remote_addr;
+        proxy_read_timeout  300;
+        proxy_buffering     off;
+    }
+
+    # Catch-all: strip /tnm-calculator prefix, proxy to Flask, rewrite HTML paths back
     location /tnm-calculator/ {
         proxy_pass          http://127.0.0.1:${FLASK_PORT}/;
         proxy_set_header    Host              \$host;
@@ -72,7 +124,6 @@ server {
 
         # Rewrite absolute paths in HTML responses so the browser stays under /tnm-calculator/
         sub_filter_once  off;
-        sub_filter_types text/html;
         sub_filter 'action="/'   'action="/tnm-calculator/';
         sub_filter 'href="/'     'href="/tnm-calculator/';
         sub_filter 'src="/'      'src="/tnm-calculator/';
