@@ -1,0 +1,18 @@
+{{- if .Values.managedCertificate.enabled }}
+# GKE-managed TLS certificate — Google provisions and auto-renews this cert.
+# Prerequisites:
+#   - DNS A record for {{ .Values.managedCertificate.domain }} must point to the
+#     Ingress external IP before Google can validate domain ownership.
+#   - Certificate reaches ACTIVE status in 10–60 minutes after DNS propagates.
+#   - Check status: kubectl describe managedcertificate {{ .Values.managedCertificate.name }} -n {{ .Values.namespace }}
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: {{ .Values.managedCertificate.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "tnm.labels" . | nindent 4 }}
+spec:
+  domains:
+    - {{ .Values.managedCertificate.domain }}
+{{- end }}
