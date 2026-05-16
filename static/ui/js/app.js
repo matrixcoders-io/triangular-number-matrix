@@ -282,14 +282,6 @@ function initDigitSelector() {
         ta.dispatchEvent(new Event('input'));  // syncs count display + constants panel
       }
 
-      // Set increment to preferred length if field is empty or zero.
-      const num2El = document.getElementById('num2');
-      const rhNum2 = document.getElementById('num2-rh');
-      if (num2El && (!num2El.value.trim() || parseInt(num2El.value, 10) === 0)) {
-        num2El.value = String(_preferredDigitCount);
-        if (rhNum2) rhNum2.value = String(_preferredDigitCount);
-      }
-
       document.querySelector('.btn-calculate')?.click();
     });
   });
@@ -301,12 +293,6 @@ function initDigitSelector() {
     taInit.value = taInit.value.slice(0, _preferredDigitCount);
     taInit.dispatchEvent(new Event('input'));
     document.querySelector('.btn-calculate')?.click();
-  }
-  const num2Init = document.getElementById('num2');
-  const rhNum2Init = document.getElementById('num2-rh');
-  if (num2Init && (!num2Init.value.trim() || parseInt(num2Init.value, 10) === 0)) {
-    num2Init.value = String(_preferredDigitCount);
-    if (rhNum2Init) rhNum2Init.value = String(_preferredDigitCount);
   }
 }
 
