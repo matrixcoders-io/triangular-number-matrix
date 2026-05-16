@@ -50,7 +50,7 @@ echo "[2/7] Writing nginx config..."
 cat > /etc/nginx/conf.d/calculator.conf <<NGINX
 # Rate-limit zones — valid here because conf.d/ is included inside nginx's http {} block
 # SEC-05: protect heavy compute endpoints from abuse
-limit_req_zone \$binary_remote_addr zone=tnm_calc:10m rate=5r/m;
+limit_req_zone \$binary_remote_addr zone=tnm_calc:10m rate=100r/m;
 limit_req_zone \$binary_remote_addr zone=tnm_lab:10m  rate=1r/m;
 
 server {
@@ -77,9 +77,9 @@ server {
         proxy_set_header Host \$host;
     }
 
-    # SEC-05: rate-limit the calculation endpoint (5 req/min per IP, burst 3)
+    # SEC-05: rate-limit the calculation endpoint (100 req/min per IP, burst 30)
     location /tnm-calculator/calc {
-        limit_req        zone=tnm_calc burst=3 nodelay;
+        limit_req        zone=tnm_calc burst=30 nodelay;
         limit_req_status 429;
         proxy_pass          http://127.0.0.1:${FLASK_PORT}/calc;
         proxy_set_header    Host              \$host;
