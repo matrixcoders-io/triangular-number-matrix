@@ -1,0 +1,24 @@
+# Local development / test compose
+# Run from project root: docker compose -f docker/docker-compose.yml up --build
+#
+# The build context is .. (project root) so the Dockerfile can COPY the full app.
+# static/output is bind-mounted directly so run history and TN results persist
+# between container restarts on your local machine.
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "5000:5000"
+    volumes:
+      # Bind-mount the real output directory so run_history.json, leaderboard.json,
+      # and TN output files survive container restarts during local testing.
+      - ../static/output:/app/static/output
+    environment:
+      - UI_HTTP_FILE_TRANSFER=true
+      - UI_HTTP_FILE_MAX_DIGITS=10000000
+    # Override CMD to use Flask dev server with auto-reload for local iteration.
+    # Remove this 'command' block to test the production gunicorn entrypoint instead.
+    command: ["python", "-m", "flask", "--app", "app", "run", "--host", "0.0.0.0", "--port", "5000", "--debug"]

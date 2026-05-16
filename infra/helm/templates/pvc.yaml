@@ -1,0 +1,20 @@
+{{- if .Values.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "tnm.fullname" . }}-output
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "tnm.labels" . | nindent 4 }}
+  annotations:
+    # Retain the PVC on helm uninstall so run history and leaderboard survive
+    # accidental chart deletion. Delete manually when you truly want to wipe data.
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    - {{ .Values.persistence.accessMode }}
+  storageClassName: {{ .Values.persistence.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size }}
+{{- end }}
