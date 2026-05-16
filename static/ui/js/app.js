@@ -191,6 +191,7 @@ const vpcKeys = ['vpc1','vpc2','vpc3','vpc4','vpc5','vpc6','vpc7','vpc8','vpc9']
 // Persist the last calculated active constant so digit-family browsing doesn't clear it.
 let _calcDigit     = null;  // digit family of the last calculation (e.g. '1')
 let _calcActiveKey = null;  // vpc key of the last active constant (e.g. 'vpc3')
+let _preferredDigitCount = 400;  // user's preferred digit count; 400 until they explicitly change it
 
 function updateConstantsPanel(digitStr, activeVpcKey) {
   const data = MATRIX[digitStr];
@@ -269,13 +270,44 @@ function initDigitSelector() {
       const d = btn.dataset.digit;
       const key = (d === _calcDigit) ? _calcActiveKey : null;
       updateConstantsPanel(d, key);
-      // Load the minimum file for this digit family, then auto-calculate.
+
+      // Snapshot preference BEFORE loadFile — loadFile triggers syncCount which
+      // overwrites countEl.value to the file length (1000), corrupting any read after await.
+      const targetLen = _preferredDigitCount;
       await loadFile(`${d}-1k.txt`);
+
+      const ta = document.getElementById('number-input');
+      if (ta) {
+        ta.value = d.repeat(targetLen);
+        ta.dispatchEvent(new Event('input'));  // syncs count display + constants panel
+      }
+
+      // Set increment to preferred length if field is empty or zero.
+      const num2El = document.getElementById('num2');
+      const rhNum2 = document.getElementById('num2-rh');
+      if (num2El && (!num2El.value.trim() || parseInt(num2El.value, 10) === 0)) {
+        num2El.value = String(_preferredDigitCount);
+        if (rhNum2) rhNum2.value = String(_preferredDigitCount);
+      }
+
       document.querySelector('.btn-calculate')?.click();
     });
   });
-  // Default: show digit 1 on load
+
+  // Initial load: server pre-renders with 1000 chars — trim to preferred length and re-calculate.
   updateConstantsPanel('1', null);
+  const taInit = document.getElementById('number-input');
+  if (taInit && taInit.value.length > _preferredDigitCount) {
+    taInit.value = taInit.value.slice(0, _preferredDigitCount);
+    taInit.dispatchEvent(new Event('input'));
+    document.querySelector('.btn-calculate')?.click();
+  }
+  const num2Init = document.getElementById('num2');
+  const rhNum2Init = document.getElementById('num2-rh');
+  if (num2Init && (!num2Init.value.trim() || parseInt(num2Init.value, 10) === 0)) {
+    num2Init.value = String(_preferredDigitCount);
+    if (rhNum2Init) rhNum2Init.value = String(_preferredDigitCount);
+  }
 }
 
 /* ============================================================
@@ -1301,6 +1333,7 @@ function initInputDigitSteppers() {
     if (!ta || !ta.value.trim()) return;
     if (ta.value.length >= maxDigits) return;
     ta.value = ta.value + ta.value[ta.value.length - 1];
+    _preferredDigitCount = ta.value.length;
     ta.dispatchEvent(new Event('input'));
     document.querySelector('.btn-calculate')?.click();
   });
@@ -1308,6 +1341,7 @@ function initInputDigitSteppers() {
   document.getElementById('btn-input-dec')?.addEventListener('click', () => {
     if (!ta || ta.value.length === 0) return;
     ta.value = ta.value.slice(0, -1);
+    _preferredDigitCount = ta.value.length;
     ta.dispatchEvent(new Event('input'));
     if (ta.value.trim().length > 0) {
       document.querySelector('.btn-calculate')?.click();
@@ -1326,6 +1360,7 @@ function initInputDigitSteppers() {
     if (isNaN(target) || target < 1) { countEl.value = ta.value.length; return; }
     target = Math.min(target, maxDigits);
     countEl.value = target;
+    _preferredDigitCount = target;
     const cur = ta.value;
     if (target < cur.length) {
       ta.value = cur.slice(0, target);
@@ -1343,6 +1378,7 @@ function initInputDigitSteppers() {
     if (isNaN(target) || target < 1) { countEl.value = ta.value.length; return; }
     target = Math.min(target, maxDigits);
     countEl.value = target;
+    _preferredDigitCount = target;
 
     const current = ta.value;
     if (target === current.length) return;
