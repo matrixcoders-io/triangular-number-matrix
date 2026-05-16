@@ -61,6 +61,11 @@ NGINX_CONF="/etc/nginx/conf.d/calculator.conf"
 info "Writing nginx config → $NGINX_CONF"
 
 cat > "$NGINX_CONF" <<NGINX
+# Rate-limit zones — valid here because conf.d/ is included inside nginx's http {} block
+# SEC-05: protect heavy compute endpoints from abuse
+limit_req_zone \$binary_remote_addr zone=tnm_calc:10m rate=5r/m;
+limit_req_zone \$binary_remote_addr zone=tnm_lab:10m  rate=1r/m;
+
 server {
     listen 80;
     server_name ${DOMAIN};
@@ -70,6 +75,45 @@ server {
     add_header X-Content-Type-Options "nosniff"      always;
     add_header Referrer-Policy        "strict-origin" always;
 
+    # SEC-03 / SEC-04: block external access to stats write endpoints
+    location /stats/history/clear {
+        allow 127.0.0.1;
+        deny  all;
+        proxy_pass http://127.0.0.1:${FLASK_PORT}/stats/history/clear;
+        proxy_set_header Host \$host;
+    }
+    location /stats/history/append {
+        allow 127.0.0.1;
+        deny  all;
+        proxy_pass http://127.0.0.1:${FLASK_PORT}/stats/history/append;
+        proxy_set_header Host \$host;
+    }
+
+    # SEC-05: rate-limit calculation endpoint (5 req/min per IP, burst 3)
+    location /calc {
+        limit_req        zone=tnm_calc burst=3 nodelay;
+        limit_req_status 429;
+        proxy_pass          http://127.0.0.1:${FLASK_PORT}/calc;
+        proxy_set_header    Host              \$host;
+        proxy_set_header    X-Real-IP         \$remote_addr;
+        proxy_set_header    X-Forwarded-For   \$proxy_add_x_forwarded_for;
+        proxy_set_header    X-Forwarded-Proto \$scheme;
+        proxy_read_timeout  300;
+        proxy_buffering     off;
+    }
+
+    # SEC-05: rate-limit lab test runner (1 req/min per IP — spawns subprocess)
+    location /lab/run-tests {
+        limit_req        zone=tnm_lab burst=1 nodelay;
+        limit_req_status 429;
+        proxy_pass          http://127.0.0.1:${FLASK_PORT}/lab/run-tests;
+        proxy_set_header    Host              \$host;
+        proxy_set_header    X-Real-IP         \$remote_addr;
+        proxy_read_timeout  300;
+        proxy_buffering     off;
+    }
+
+    # Catch-all
     location / {
         proxy_pass          http://127.0.0.1:${FLASK_PORT};
         proxy_set_header    Host              \$host;

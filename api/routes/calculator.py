@@ -25,6 +25,7 @@ from config import (
     HTTP_CHAR_LIMIT,
     ALLOWED_FILES,
     UI_FILE_GENERATE_ENABLED,
+    MAX_INCREMENT,
 )
 from api.routes.stats import _load_history, _save_history, _update_leaderboard
 
@@ -142,6 +143,13 @@ def handle_big_number_math(request_type: str):
             # Use textarea content when it's within the char limit; otherwise load from disk.
             # Strict less-than ensures truncated previews (= HTTP_CHAR_LIMIT chars) go to disk.
             use_textarea = HTTP_CHAR_LIMIT > 0 and len(num1) < HTTP_CHAR_LIMIT
+
+            # SEC-12: reject oversized increment before any computation
+            if num2 and num2.lstrip('-').isdigit() and abs(int(num2)) > MAX_INCREMENT:
+                return render_template(
+                    "partials/result_panel.html",
+                    error=f"Increment must be between -{MAX_INCREMENT:,} and {MAX_INCREMENT:,}.",
+                )
 
             if not use_textarea:
                 if not file_name:
@@ -323,7 +331,7 @@ def handle_big_number_math(request_type: str):
 
         except Exception as e:
             logger.error("Error during operation %s: %s", operation, e, exc_info=True)
-            error = str(e)
+            error = "Calculation failed. Check your input and try again."  # SEC-07: don't leak internals
 
     if request_type == "API":
         logger.info("API request operation: %s", operation)
