@@ -386,7 +386,7 @@ def index():
     default_path = os.path.join(NUMBERS_DIR, default_filename)
     if os.path.isfile(default_path):
         try:
-            num1 = read_file_content(default_path)
+            num1 = read_file_content(default_path)[:400]
             start = time.perf_counter()
             b = TriangulaNumberMatrix("1")
             result_str = str(b.repDigitTriangularNumber(num1))
