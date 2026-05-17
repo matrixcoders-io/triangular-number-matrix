@@ -224,6 +224,13 @@
         <option value="tri_div_gmpy2_formula">Division gmpy2</option>
         <option value="tri_div_simpy_formula">Division sympy</option>
       </select>
+      <div style="display:flex; align-items:stretch; gap:3px;">
+        <button type="button" id="btn-len-dec-rh" class="btn-stepper btn-stepper-sm">−</button>
+        <input type="number" id="len-step-rh"  class="increment-step increment-step-sm" value="1" min="1" title="Length step">
+        <input type="number" id="digit-count-rh" class="input-control input-control-sm" min="1" max="10000" style="text-align:center;width:56px;" title="Input Number Length">
+        <input type="number" id="len-step-rh-r" class="increment-step increment-step-sm" value="1" min="1" title="Length step">
+        <button type="button" id="btn-len-inc-rh" class="btn-stepper btn-stepper-sm">+</button>
+      </div>
     </div>
     <div class="panel-header-actions">
       <button class="btn-close-panel btn-nav" type="button" title="Close expanded view">✕</button>

@@ -1308,6 +1308,13 @@ function initInputDigitSteppers() {
   const countEl = document.getElementById('input-digit-count');
   const maxDigits = parseInt(countEl?.getAttribute('max') || '10000', 10);
 
+  // Reads the step configured in the expanded Run History length control.
+  // Shared so Calculator panel ± buttons honour whatever step the user set there.
+  function getLenStep() {
+    const s = parseInt(document.getElementById('len-step-rh')?.value, 10);
+    return (isNaN(s) || s < 1) ? 1 : s;
+  }
+
   function syncCount() {
     if (countEl) countEl.value = ta ? ta.value.length : 0;
   }
@@ -1317,8 +1324,8 @@ function initInputDigitSteppers() {
 
   document.getElementById('btn-input-inc')?.addEventListener('click', () => {
     if (!ta || !ta.value.trim()) return;
-    if (ta.value.length >= maxDigits) return;
-    ta.value = ta.value + ta.value[ta.value.length - 1];
+    const step = getLenStep();
+    ta.value = (ta.value + ta.value[ta.value.length - 1].repeat(step)).slice(0, maxDigits);
     _preferredDigitCount = ta.value.length;
     ta.dispatchEvent(new Event('input'));
     document.querySelector('.btn-calculate')?.click();
@@ -1326,7 +1333,7 @@ function initInputDigitSteppers() {
 
   document.getElementById('btn-input-dec')?.addEventListener('click', () => {
     if (!ta || ta.value.length === 0) return;
-    ta.value = ta.value.slice(0, -1);
+    ta.value = ta.value.slice(0, Math.max(0, ta.value.length - getLenStep()));
     _preferredDigitCount = ta.value.length;
     ta.dispatchEvent(new Event('input'));
     if (ta.value.trim().length > 0) {
@@ -1427,6 +1434,54 @@ function initHistoryInlineControls() {
 
   document.getElementById('btn-inc-dec-rh')?.addEventListener('click', () => rhStepFn(-1));
   document.getElementById('btn-inc-inc-rh')?.addEventListener('click', () => rhStepFn(1));
+
+  // ── Input Number Length controls ──────────────────────────────────────────
+  const rhLenStep    = document.getElementById('len-step-rh');
+  const rhLenStepR   = document.getElementById('len-step-rh-r');
+  const rhDigitCount = document.getElementById('digit-count-rh');
+  const mainCountEl  = document.getElementById('input-digit-count');
+  const mainTa       = document.getElementById('number-input');
+  const maxLen       = parseInt(mainCountEl?.getAttribute('max') || '10000', 10);
+
+  if (rhDigitCount) rhDigitCount.value = _preferredDigitCount;
+
+  rhLenStep?.addEventListener('input',  () => { if (rhLenStepR) rhLenStepR.value = rhLenStep.value; });
+  rhLenStepR?.addEventListener('input', () => { if (rhLenStep)  rhLenStep.value  = rhLenStepR.value; });
+
+  // Sync main → RH when user manually changes main count field
+  mainCountEl?.addEventListener('input', () => { if (rhDigitCount) rhDigitCount.value = mainCountEl.value; });
+
+  function getLenStep() {
+    const s = parseInt(rhLenStep?.value, 10);
+    return (isNaN(s) || s < 1) ? 100 : s;
+  }
+
+  function applyLength(newLen) {
+    newLen = Math.max(1, Math.min(newLen, maxLen));
+    if (rhDigitCount) rhDigitCount.value = newLen;
+    _preferredDigitCount = newLen;
+    if (mainTa && mainTa.value.trim()) {
+      const cur = mainTa.value;
+      if (newLen < cur.length) {
+        mainTa.value = cur.slice(0, newLen);
+      } else if (newLen > cur.length) {
+        mainTa.value = cur + cur[cur.length - 1].repeat(newLen - cur.length);
+      }
+      mainTa.dispatchEvent(new Event('input'));  // syncs mainCountEl display
+    }
+    if (mainTa?.value.trim()) document.querySelector('.btn-calculate')?.click();
+  }
+
+  document.getElementById('btn-len-dec-rh')?.addEventListener('click', () => {
+    applyLength((parseInt(rhDigitCount?.value, 10) || _preferredDigitCount) - getLenStep());
+  });
+  document.getElementById('btn-len-inc-rh')?.addEventListener('click', () => {
+    applyLength((parseInt(rhDigitCount?.value, 10) || _preferredDigitCount) + getLenStep());
+  });
+  rhDigitCount?.addEventListener('change', () => {
+    const v = parseInt(rhDigitCount.value, 10);
+    if (!isNaN(v)) applyLength(v);
+  });
 }
 
 /* ============================================================
