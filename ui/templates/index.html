@@ -522,8 +522,8 @@
         <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--green);">${Number(r.result_chars).toLocaleString()}</td>
         <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--amber);">${r.elapsed.toFixed(4)}s</td>
         <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--amber);">${r.increment ?? 0}</td>
-        <td style="font-family:var(--font-mono);font-size:0.65rem;white-space:nowrap;">${r.mid_pattern ? colorizePattern(r.mid_pattern, r.repdigit) : '—'}</td>
-        <td style="font-family:var(--font-mono);font-size:0.65rem;white-space:nowrap;">${r.end_pattern ? colorizePattern(r.end_pattern, r.repdigit, true) : '—'}</td>
+        <td style="font-family:var(--font-mono);font-size:1.3rem;white-space:nowrap;">${r.mid_pattern ? colorizePattern(r.mid_pattern, r.repdigit) : '—'}</td>
+        <td style="font-family:var(--font-mono);font-size:1.3rem;white-space:nowrap;">${r.end_pattern ? colorizePattern(r.end_pattern, r.repdigit, true) : '—'}</td>
       </tr>`).join('');
     wrap.innerHTML = `
       <div style="overflow-x:auto">
