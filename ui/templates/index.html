@@ -56,7 +56,7 @@
             <div class="input-label">Increment</div>
             <div style="display:flex; align-items:stretch; gap:3px;">
               <button type="button" id="btn-increment-dec" class="btn-stepper">−</button>
-              <input type="number" id="increment-step-l" class="increment-step" value="10" min="1" title="Step size">
+              <input type="number" id="increment-step-l" class="increment-step" value="1" min="1" title="Step size">
               <input
                 class="input-control"
                 type="text"
@@ -66,7 +66,7 @@
                 placeholder="0"
                 style="text-align:center; min-width:0; flex:1;"
               >
-              <input type="number" id="increment-step-r" class="increment-step" value="10" min="1" title="Step size">
+              <input type="number" id="increment-step-r" class="increment-step" value="1" min="1" title="Step size">
               <button type="button" id="btn-increment-inc" class="btn-stepper">+</button>
             </div>
           </div>
@@ -211,9 +211,9 @@
     <div class="panel-header-controls" id="history-inline-controls">
       <div style="display:flex; align-items:stretch; gap:3px;">
         <button type="button" id="btn-inc-dec-rh" class="btn-stepper btn-stepper-sm">−</button>
-        <input type="number" id="inc-step-rh" class="increment-step increment-step-sm" value="10" min="1" title="Step size">
+        <input type="number" id="inc-step-rh" class="increment-step increment-step-sm" value="1" min="1" title="Step size">
         <input type="text" id="num2-rh" class="input-control input-control-sm" placeholder="0" style="text-align:center;">
-        <input type="number" id="inc-step-rh-r" class="increment-step increment-step-sm" value="10" min="1" title="Step size">
+        <input type="number" id="inc-step-rh-r" class="increment-step increment-step-sm" value="1" min="1" title="Step size">
         <button type="button" id="btn-inc-inc-rh" class="btn-stepper btn-stepper-sm">+</button>
       </div>
       <select id="operation-rh" class="select-control select-control-sm">
@@ -431,7 +431,7 @@
   }
 
   // ── History pattern colorizer ───────────────────────────────────
-  function colorizePattern(text, digit, isEnd = false) {
+  function colorizePattern(text, digit, isEnd = false, crossPositions = null) {
     if (!text || typeof MATRIX === 'undefined' || !MATRIX[digit]) return text || '—';
     const data = MATRIX[digit];
     const showHpl = document.getElementById('toggle-hpl')?.classList.contains('active');
@@ -499,12 +499,95 @@
       let j = i;
       while (j < len && colors[j] === c) j++;
       const chunk = text.slice(i, j);
-      html += c === 'dev'
-        ? `<span style="color:var(--green)">${chunk}</span>`
-        : `<span class="${CLASS_MAP[c]}">${chunk}</span>`;
+      if (c === 'dev') {
+        if (crossPositions) {
+          for (let k = i; k < j; k++)
+            html += crossPositions.has(k)
+              ? `<span style="color:var(--amber)">${text[k]}</span>`
+              : `<span style="color:var(--green)">${text[k]}</span>`;
+        } else {
+          html += `<span style="color:var(--green)">${chunk}</span>`;
+        }
+      } else if (crossPositions && isEnd) {
+        for (let k = i; k < j; k++)
+          html += crossPositions.has(k)
+            ? `<span style="color:var(--amber)">${text[k]}</span>`
+            : `<span class="${CLASS_MAP[c]}">${text[k]}</span>`;
+      } else {
+        html += `<span class="${CLASS_MAP[c]}">${chunk}</span>`;
+      }
       i = j;
     }
     return html;
+  }
+
+  // ── Cross-run pattern toggle state ─────────────────────────────
+  let _crossMidOn = true;
+  let _crossEndOn = true;
+
+  // ── Cross-run pattern analysis ──────────────────────────────────
+  // Returns array (chronological order) of {mid: Set<pos>, end: Set<pos>} per run.
+  function computeCrossRunMarks(data) {
+    const n = data.length;
+    const marks = data.map(() => ({ mid: new Set(), end: new Set() }));
+    for (let i = 1; i < n; i++) {
+      const curr = data[i], prev = data[i - 1];
+      // END-PATTERN: same exact digit at same position across 2 consecutive runs
+      if (_crossEndOn && curr.end_pattern && prev.end_pattern) {
+        const len = Math.min(curr.end_pattern.length, prev.end_pattern.length);
+        for (let p = 0; p < len; p++) {
+          if (curr.end_pattern[p] === prev.end_pattern[p])
+            marks[i].end.add(p);
+        }
+      }
+      // MID-PATTERN equality: same digit at same left-half position across 2 consecutive runs
+      if (_crossMidOn && curr.mid_pattern && prev.mid_pattern) {
+        const lenEq = Math.min(curr.mid_pattern.length, prev.mid_pattern.length);
+        const leftEndEq = Math.floor(lenEq / 2) - 1;
+        for (let p = 0; p <= leftEndEq; p++) {
+          if (curr.mid_pattern[p] === prev.mid_pattern[p])
+            marks[i].mid.add(p);
+        }
+      }
+      // MID-PATTERN delta: same delta (mod 10, non-zero) at same left-half position across 3 runs
+      if (_crossMidOn && i >= 2 && curr.mid_pattern && prev.mid_pattern && data[i-2].mid_pattern) {
+        const pp = data[i - 2];
+        const len = Math.min(curr.mid_pattern.length, prev.mid_pattern.length, pp.mid_pattern.length);
+        const leftEnd = Math.floor(len / 2) - 1;
+        for (let p = 0; p <= leftEnd; p++) {
+          const d0 = parseInt(pp.mid_pattern[p]);
+          const d1 = parseInt(prev.mid_pattern[p]);
+          const d2 = parseInt(curr.mid_pattern[p]);
+          if (isNaN(d0) || isNaN(d1) || isNaN(d2)) continue;
+          const delta1 = (d1 - d0 + 10) % 10;
+          const delta2 = (d2 - d1 + 10) % 10;
+          if (delta1 !== 0 && delta1 === delta2) {
+            marks[i].mid.add(p);
+            marks[i - 1].mid.add(p);
+          }
+        }
+      }
+    }
+    // Forward pass: mark run[i] when it matches run[i+1] — catches the first run of each group
+    for (let i = 0; i < n - 1; i++) {
+      const curr = data[i], next = data[i + 1];
+      if (_crossEndOn && curr.end_pattern && next.end_pattern) {
+        const len = Math.min(curr.end_pattern.length, next.end_pattern.length);
+        for (let p = 0; p < len; p++) {
+          if (curr.end_pattern[p] === next.end_pattern[p])
+            marks[i].end.add(p);
+        }
+      }
+      if (_crossMidOn && curr.mid_pattern && next.mid_pattern) {
+        const lenFwd = Math.min(curr.mid_pattern.length, next.mid_pattern.length);
+        const leftEndFwd = Math.floor(lenFwd / 2) - 1;
+        for (let p = 0; p <= leftEndFwd; p++) {
+          if (curr.mid_pattern[p] === next.mid_pattern[p])
+            marks[i].mid.add(p);
+        }
+      }
+    }
+    return marks;
   }
 
   // ── History table renderer ──────────────────────────────────────
@@ -513,7 +596,11 @@
       wrap.innerHTML = '<span style="color: var(--text-secondary); font-size: 0.82rem;">No runs recorded yet. Run a calculation to see benchmarks here.</span>';
       return;
     }
-    const rows = data.slice().reverse().map(r => `
+    const marks = computeCrossRunMarks(data);
+    const rows = data.slice().reverse().map((r, displayIdx) => {
+      const chronIdx = data.length - 1 - displayIdx;
+      const rowMarks = marks[chronIdx];
+      return `
       <tr>
         <td style="color:var(--text-secondary);font-family:var(--font-mono);font-size:0.75rem;">${r.ts}</td>
         <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--cyan);">${r.method}</td>
@@ -522,19 +609,35 @@
         <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--green);">${Number(r.result_chars).toLocaleString()}</td>
         <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--amber);">${r.elapsed.toFixed(4)}s</td>
         <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--amber);">${r.increment ?? 0}</td>
-        <td style="font-family:var(--font-mono);font-size:1.3rem;white-space:nowrap;">${r.mid_pattern ? colorizePattern(r.mid_pattern, r.repdigit) : '—'}</td>
-        <td style="font-family:var(--font-mono);font-size:1.3rem;white-space:nowrap;">${r.end_pattern ? colorizePattern(r.end_pattern, r.repdigit, true) : '—'}</td>
-      </tr>`).join('');
+        <td style="font-family:var(--font-mono);font-size:1.3rem;white-space:nowrap;">${r.mid_pattern ? colorizePattern(r.mid_pattern, r.repdigit, false, _crossMidOn ? rowMarks.mid : null) : '—'}</td>
+        <td style="font-family:var(--font-mono);font-size:1.3rem;white-space:nowrap;">${r.end_pattern ? colorizePattern(r.end_pattern, r.repdigit, true, _crossEndOn ? rowMarks.end : null) : '—'}</td>
+      </tr>`;
+    }).join('');
     wrap.innerHTML = `
-      <div style="overflow-x:auto">
+      <div style="overflow-x:auto;overflow-y:auto;max-height:420px;">
         <table class="file-table">
-          <thead><tr>
-            <th>Time</th><th>Method</th><th>Digit Family</th><th>Input Length</th><th>Output Length</th>
-            <th>Elapsed</th><th>Increment</th><th>MID-PATTERN</th><th>END-PATTERN</th>
+          <thead style="position:sticky;top:0;z-index:2;"><tr>
+            <th style="background:var(--bg-card);">Time</th>
+            <th style="background:var(--bg-card);">Method</th>
+            <th style="background:var(--bg-card);">Digit Family</th>
+            <th style="background:var(--bg-card);">Input Length</th>
+            <th style="background:var(--bg-card);">Output Length</th>
+            <th style="background:var(--bg-card);">Elapsed</th>
+            <th style="background:var(--bg-card);">Increment</th>
+            <th style="background:var(--bg-card);">MID-PATTERN <button type="button" class="pattern-toggle mid-cross ${_crossMidOn ? 'active' : ''}" id="toggle-cross-mid" title="Cross-run patterns">ON</button></th>
+            <th style="background:var(--bg-card);">END-PATTERN <button type="button" class="pattern-toggle end-cross ${_crossEndOn ? 'active' : ''}" id="toggle-cross-end" title="Cross-run patterns">ON</button></th>
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>`;
+    wrap.querySelector('#toggle-cross-mid')?.addEventListener('click', () => {
+      _crossMidOn = !_crossMidOn;
+      renderHistoryTable(wrap, data);
+    });
+    wrap.querySelector('#toggle-cross-end')?.addEventListener('click', () => {
+      _crossEndOn = !_crossEndOn;
+      renderHistoryTable(wrap, data);
+    });
   }
 
   // ── HTMX swap handlers ──────────────────────────────────────────
