@@ -1163,6 +1163,12 @@ body {
   border-color: var(--amber);
   color: #000;
 }
+.pattern-toggle.active.mid-cross,
+.pattern-toggle.active.end-cross {
+  border-color: var(--gold);
+  color: var(--gold);
+  box-shadow: 0 0 6px var(--gold-glow);
+}
 
 /* Custom scrollbar */
 .number-display::-webkit-scrollbar { width: 6px; }
@@ -1444,6 +1450,10 @@ body {
 .panel.panel-expanded #lab-output {
   max-height: none !important;
   flex: 1;
+}
+.panel.panel-expanded #history-table-wrap > div {
+  max-height: none !important;
+  overflow-y: visible !important;
 }
 .panel.panel-expanded .panel-body > div[style*="max-height"] {
   max-height: none !important;
