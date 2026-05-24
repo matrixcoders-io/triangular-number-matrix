@@ -350,6 +350,64 @@ def _print_failures(recs):
         print()
 
 
+def fix_report(log_before, log_after):
+    """
+    Compare two runs and return a structured diff:
+      fixed        — records that went FAIL → PASS (good)
+      regressed    — records that went PASS → FAIL (bad)
+      net          — fixed - regressed
+      by_digit     — per-digit breakdown of both
+      new_mismatch_types — mismatch types that appeared in log_after but not log_before
+    """
+    def load(path):
+        records = {}
+        mismatches = {}
+        for rec in _parse_records(path):
+            k = (rec['d'], rec['inc'], rec['L'])
+            records[k] = rec['status']
+            mismatches[k] = set(rec['mismatches'])
+        return records, mismatches
+
+    s1, m1 = load(log_before)
+    s2, m2 = load(log_after)
+    all_keys = sorted(set(s1) | set(s2))
+
+    fixed, regressed = [], []
+    by_digit = {}
+    for k in all_keys:
+        d = k[0]
+        if d not in by_digit:
+            by_digit[d] = {'fixed': 0, 'regressed': 0}
+        v1, v2 = s1.get(k), s2.get(k)
+        if v1 == 'FAIL' and v2 == 'PASS':
+            fixed.append({'d': k[0], 'inc': k[1], 'L': k[2]})
+            by_digit[d]['fixed'] += 1
+        elif v1 == 'PASS' and v2 == 'FAIL':
+            regressed.append({'d': k[0], 'inc': k[1], 'L': k[2],
+                              'new_mismatches': m2.get(k, set()) - m1.get(k, set())})
+            by_digit[d]['regressed'] += 1
+
+    # Mismatch types that increased in frequency
+    def mtype_counts(mdict):
+        c = {}
+        for ms in mdict.values():
+            for m in ms:
+                c[m] = c.get(m, 0) + 1
+        return c
+    mc1, mc2 = mtype_counts(m1), mtype_counts(m2)
+    introduced = {k: mc2[k] for k in mc2 if mc2[k] > mc1.get(k, 0)}
+    eliminated = {k: mc1[k] for k in mc1 if mc1.get(k, 0) > mc2.get(k, 0)}
+
+    return {
+        'log_before': log_before, 'log_after': log_after,
+        'fixed': fixed, 'regressed': regressed,
+        'net': len(fixed) - len(regressed),
+        'by_digit': by_digit,
+        'introduced': introduced,   # mismatch types that got worse
+        'eliminated': eliminated,   # mismatch types that got better
+    }
+
+
 def _print_compare(c):
     print(f"Before: {c['log1']}")
     print(f"After:  {c['log2']}")
@@ -458,6 +516,33 @@ def main():
         d = _flag(rest, '--digit')
         m = _flag(rest, '--mismatch')
         _print_failures(failures(log, digit=d, mismatch=m))
+
+    elif cmd == 'fix-report':
+        non_flag = [a for a in rest if not a.startswith('--')]
+        if len(non_flag) < 2:
+            print('Usage: fix-report <log_before> <log_after>')
+            sys.exit(1)
+        r = fix_report(non_flag[0], non_flag[1])
+        print(f"Before: {r['log_before']}")
+        print(f"After:  {r['log_after']}")
+        print(f"\nFixed (FAIL→PASS): {len(r['fixed'])}   Regressed (PASS→FAIL): {len(r['regressed'])}   Net: {r['net']:+d}")
+        print(f"\nPer-digit:")
+        print(f"  {'d':>3}  {'fixed':>7}  {'regressed':>10}")
+        for d in sorted(r['by_digit']):
+            s = r['by_digit'][d]
+            if s['fixed'] or s['regressed']:
+                reg_flag = ' ⚠' if s['regressed'] else ''
+                print(f"  {d:>3}  {s['fixed']:>7}  {s['regressed']:>10}{reg_flag}")
+        if r['eliminated']:
+            print(f"\nEliminated mismatch types:")
+            for k, v in sorted(r['eliminated'].items()):
+                print(f"  {k}: -{v}")
+        if r['introduced']:
+            print(f"\nIntroduced mismatch types ⚠:")
+            for k, v in sorted(r['introduced'].items()):
+                print(f"  {k}: +{v}")
+        if not r['regressed']:
+            print('\n✓ No regressions.')
 
     elif cmd == 'compare':
         non_flag = [a for a in rest if not a.startswith('--')]
