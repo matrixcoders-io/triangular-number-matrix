@@ -777,7 +777,10 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   // Python build_left tiles L→R: full tiles then hpl[0:rem] at the end.
   // So leftRemStr = head of hpl (first leftRemLen chars).
   const leftTilesPart = leftPart.slice(lcLen);
-  const leftRemLen    = leftTilesPart.length % tileHplLen;
+  let leftRemLen      = leftTilesPart.length % tileHplLen;
+  // When VPC falls at an exact tile boundary (leftRemLen=0), treat the last full tile as
+  // leftRemStr so VPC-adjacent chars appear only at the apex, not in every body row.
+  if (leftRemLen === 0 && leftTilesPart.length >= tileHplLen) leftRemLen = tileHplLen;
   const leftRemStr    = leftRemLen > 0 ? leftTilesPart.slice(-leftRemLen) : '';
   const leftFullStr   = leftRemLen > 0 ? leftTilesPart.slice(0, -leftRemLen) : leftTilesPart;
   const leftFull      = [];
