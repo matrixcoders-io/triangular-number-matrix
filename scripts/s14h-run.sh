@@ -109,8 +109,9 @@ else
   START_SERVER=0
 fi
 
-# Clean old test files in /tmp/
-rm -f /tmp/s14v_*.json /tmp/s14v_*.html 2>/dev/null || true
+# Clean old test files in /tmp/ (find avoids arg-list-too-long on large runs)
+find /tmp -maxdepth 1 -name 's14v_*.json' -delete 2>/dev/null || true
+find /tmp -maxdepth 1 -name 's14v_*.html' -delete 2>/dev/null || true
 
 echo "Fetching and parsing $TOTAL ops (progress on terminal only)..."
 
