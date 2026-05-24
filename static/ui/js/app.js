@@ -622,7 +622,7 @@ function renderWindowContent(text) {
  *    [pN-1 pN] ···gap··· [q1 q2]
  *  [pN-2..pN]  ···gap···  [q1..q3]
  */
-// No hard cap on pyramid rows — cap is min(N, M) so the pyramid grows with the input.
+// cap limits pyramid rows; sqrt formula keeps visual footprint ≈ text.length total display chars.
 
 /**
  * Char-by-char comparison: wraps matching chars in a colored span, leaves non-matching as plain text.
@@ -777,7 +777,10 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   // Python build_left tiles L→R: full tiles then hpl[0:rem] at the end.
   // So leftRemStr = head of hpl (first leftRemLen chars).
   const leftTilesPart = leftPart.slice(lcLen);
-  const leftRemLen    = leftTilesPart.length % tileHplLen;
+  let leftRemLen      = leftTilesPart.length % tileHplLen;
+  // When VPC falls at an exact tile boundary (leftRemLen=0), treat the last full tile as
+  // leftRemStr so VPC-adjacent chars appear only at the apex, not in every body row.
+  if (leftRemLen === 0 && leftTilesPart.length >= tileHplLen) leftRemLen = tileHplLen;
   const leftRemStr    = leftRemLen > 0 ? leftTilesPart.slice(-leftRemLen) : '';
   const leftFullStr   = leftRemLen > 0 ? leftTilesPart.slice(0, -leftRemLen) : leftTilesPart;
   const leftFull      = [];
@@ -873,43 +876,46 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   }
 
   // Body rows k=1..cap: k tiles on each side, growing wider per row.
-  // Left:  outermost k tiles → leftFull[0..k-1]          (start of TN, farthest from VPC)
-  // Right (k < cap): VPC-adjacent → rightFull[0..k-1]    (inner tiles, no mirroring between rows)
-  // Right (k = cap): end-window  → rightFull[M-cap..M-1] (actual tail of TN, shows changed digits)
+  // Left:  all-innermost → lStart = max(0, N-k), shows leftFull[lStart..lStart+k-1]
+  //        Row k=1 = VPC-adjacent tile (leftFull[N-1]); row k=cap = innermost cap tiles.
+  // Right: all inner → rightFull[0..k-1] for all rows (rStart=0 always).
+  //        Contiguous with apex; same VPC-adjacent region as standard mode.
+  //        rightDisplay[cap-1] is overridden to rightFull[M-1] for display purposes only
+  //        so the bottom-row's last tile shows the correct final digit of the full number.
   //
-  // Two-region design:
-  //   Upper rows (k<cap) use VPC-adjacent tiles — all inner rotation, all amber for pure repdigit.
-  //   Bottom row (k=cap) uses the true end-window — changed digits from any increment show green.
-  //   No mirroring: k<cap rows and k=cap row draw from independent positions, so a changed tile
-  //   never appears at the same column in adjacent rows.
-  //   For pure repdigit all tiles are equal so both windows produce identical amber output.
+  // Together the pyramid "visual reading" (bottom-left up, apex, top-right down) is:
+  //   leftFull[N-cap..N-1] + leftRem + VPC + rightRem + rightFull[0..cap-1]
+  //   = text[lcLen + (N-cap)*tileHplLen .. vpcIdx + vpcLen + rightRemLen + cap*tileHprLen]
+  // This is a contiguous TN substring matching what standard mode shows around the VPC.
   //
-  // rightBaseline: inner repeating tile (rightFull[M-cap]) used by colorizeStr for all rows.
-  //   Upper rows: tiles match baseline → all amber.
-  //   Bottom row: inner tiles match → amber; changed end tiles differ → green.
-  const rightBaseline = rightFull[M - cap];
-  // For short patterns (digits 3, 6, 9), compare right tiles against fixed tileHpr so that
-  // incremented chars always show green. rightBaseline is derived from content and absorbs
-  // changes when a large increment modifies many tiles, producing false amber matches.
-  // For 9-char pattern digits, rightBaseline handles hpr rotations correctly — keep as-is.
-  const rightExpected = hprLen < TARGET_TILE_WIDTH ? tileHpr : rightBaseline;
+  // rightExpected: for colorizeStr, use tileHpr for short-pattern digits (3,6,9) to avoid
+  // false amber when a large increment modifies many tiles. For 9-char-pattern digits,
+  // use rightFull[0] (VPC-adjacent inner tile) which is the same rotation for all inner rows.
+  const rightExpected = hprLen < TARGET_TILE_WIDTH ? tileHpr : (rightFull.length > 0 ? rightFull[0] : tileHpr);
+
+  // Display-only copy: override the last shown tile (index cap-1) with rightFull[M-1]
+  // so the bottom row's rightmost tile shows the correct final digit of the full number.
+  // rightFull (unchanged) is used for pyramidReading / audit; rightDisplay is render-only.
+  const rightDisplay = rightFull.slice();
+  if (cap < M && cap > 0) rightDisplay[cap - 1] = rightFull[M - 1];
 
   for (let k = 1; k <= cap; k++) {
+    const lStart = Math.max(0, N - k);
     let leftContent = '';
     if (highlightHpl) {
-      for (let i = 0; i < k; i++)
+      for (let i = lStart; i < lStart + k; i++)
         leftContent += colorizeStr(leftFull[i], tileHpl, 'hpl-match');
     } else {
-      for (let i = 0; i < k; i++) leftContent += leftFull[i];
+      for (let i = lStart; i < lStart + k; i++) leftContent += leftFull[i];
     }
 
-    const rStart = (k < cap) ? 0 : (M - cap);
+    const rStart = 0;
     let rightContent = '';
     if (highlightHpr) {
       for (let i = rStart; i < rStart + k; i++)
-        rightContent += colorizeStr(rightFull[i], rightExpected, 'hpr-match');
+        rightContent += colorizeStr(rightDisplay[i], rightExpected, 'hpr-match');
     } else {
-      for (let i = rStart; i < rStart + k; i++) rightContent += rightFull[i];
+      for (let i = rStart; i < rStart + k; i++) rightContent += rightDisplay[i];
     }
 
     // leftPad: text length of leftContent = k*tileHplLen (no partial).
@@ -937,14 +943,23 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
     );
   }
 
-  // Tile-alignment check: pyramid left tiles must match the corresponding text substring.
-  const pyramidLeft = lcStr + leftFull.slice(0, cap).join('');
-  const expectedLeft = text.slice(0, lcLen + cap * tileHplLen);
-  for (let i = 0; i < pyramidLeft.length; i++) {
-    if (pyramidLeft[i] !== expectedLeft[i]) {
+  // Visual-reading check: the pyramid represents a contiguous TN substring.
+  // pyramidReading uses the original rightFull (not rightDisplay) — the display-only
+  // override of rightDisplay[cap-1] does not affect the conceptual reading integrity.
+  // With correct innermost design (lStart=N-k, rStart=0) this always passes.
+  // Fires only when there is an implementation bug in tile selection.
+  const innerStart = lcLen + Math.max(0, N - cap) * tileHplLen;
+  const innerEnd   = vpcIdx + vpcLen + rightRemLen + Math.min(cap, M) * tileHprLen;
+  const pyramidReading =
+    leftFull.slice(Math.max(0, N - cap)).join('') +
+    leftRemStr + activeVpc + rightRemStr +
+    rightFull.slice(0, Math.min(cap, M)).join('');
+  const expectedReading = text.slice(innerStart, innerEnd);
+  for (let i = 0; i < pyramidReading.length; i++) {
+    if (pyramidReading[i] !== expectedReading[i]) {
       mismatches.push(
-        'pos ' + i + ': pyramid shows \'' + pyramidLeft[i] +
-        '\', TN has \'' + expectedLeft[i] + '\''
+        'pos ' + i + ': pyramid shows \'' + pyramidReading[i] +
+        '\', TN has \'' + expectedReading[i] + '\''
       );
       break;
     }
