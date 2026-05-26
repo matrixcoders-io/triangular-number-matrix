@@ -774,18 +774,20 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   const rightPart = text.slice(vpcIdx + activeVpc.length);
 
   // Left: skip lc prefix, then split into full hpl tiles + leftRem (partial, closest to VPC).
-  // Python build_left tiles L→R: full tiles then hpl[0:rem] at the end.
-  // So leftRemStr = head of hpl (first leftRemLen chars).
+  // Promote any increment-modified VPC-adjacent tiles into leftRemStr so body rows always
+  // show the natural tile pattern and modified chars appear only at the apex.
   const leftTilesPart = leftPart.slice(lcLen);
   let leftRemLen      = leftTilesPart.length % tileHplLen;
-  // When VPC falls at an exact tile boundary (leftRemLen=0), treat the last full tile as
-  // leftRemStr so VPC-adjacent chars appear only at the apex, not in every body row.
-  if (leftRemLen === 0 && leftTilesPart.length >= tileHplLen) leftRemLen = tileHplLen;
-  const leftRemStr    = leftRemLen > 0 ? leftTilesPart.slice(-leftRemLen) : '';
-  const leftFullStr   = leftRemLen > 0 ? leftTilesPart.slice(0, -leftRemLen) : leftTilesPart;
   const leftFull      = [];
-  for (let i = 0; i < leftFullStr.length; i += tileHplLen)
-    leftFull.push(leftFullStr.slice(i, i + tileHplLen));
+  {
+    const lfs = leftRemLen > 0 ? leftTilesPart.slice(0, -leftRemLen) : leftTilesPart;
+    for (let i = 0; i < lfs.length; i += tileHplLen)
+      leftFull.push(lfs.slice(i, i + tileHplLen));
+  }
+  if (leftFull.length > 0 && leftFull[leftFull.length - 1] !== tileHpl) {
+    leftFull.pop();  leftRemLen += tileHplLen;
+  }
+  const leftRemStr = leftRemLen > 0 ? leftTilesPart.slice(-leftRemLen) : '';
 
   // Right: use natural tile boundaries (modular rem).
   // For pure repdigit: rem = tail-of-hpr prefix length; full tiles = hpr exactly.
@@ -829,7 +831,10 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   //     For pure repdigit: rightFull[0] = hpr, so this equals hpr[-rightRemLen:] (same as before).
   //     For increment: rightFull[0] is a rotation of hpr; using its tail gives the correct
   //     expected value for the partial slot, so only genuinely changed chars show as green.
-  const colorLeftRem  = () => colorizeStr(leftRemStr,  tileHpl.slice(0, leftRemLen), 'hpl-match');
+  const leftRemRef    = leftRemLen > 0
+    ? (tileHpl.repeat(Math.ceil(leftRemLen / tileHplLen))).slice(0, leftRemLen)
+    : '';
+  const colorLeftRem  = () => colorizeStr(leftRemStr, leftRemRef, 'hpl-match');
   const colorRightRem = () => colorizeStr(
     rightRemStr,
     (hprLen < TARGET_TILE_WIDTH ? tileHpr : (rightFull.length > 1 ? rightFull[0] : tileHpr))
