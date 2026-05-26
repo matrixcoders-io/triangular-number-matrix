@@ -907,11 +907,14 @@ function buildPyramid(text, vpcVal, hpl, hpr, highlightHpl, highlightHpr) {
   for (let k = 1; k <= cap; k++) {
     const lStart = Math.max(0, N - k);
     let leftContent = '';
+    // Body rows always show the natural tile pattern. leftFull tiles near VPC may be
+    // modified by large increments — using tileHpl here prevents increment-polluted chars
+    // from bleeding into every body row. The apex (above) shows actual leftRemStr content.
     if (highlightHpl) {
       for (let i = lStart; i < lStart + k; i++)
-        leftContent += colorizeStr(leftFull[i], tileHpl, 'hpl-match');
+        leftContent += colorizeStr(tileHpl, tileHpl, 'hpl-match');
     } else {
-      for (let i = lStart; i < lStart + k; i++) leftContent += leftFull[i];
+      for (let i = lStart; i < lStart + k; i++) leftContent += tileHpl;
     }
 
     const rStart = 0;
