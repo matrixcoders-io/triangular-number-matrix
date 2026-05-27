@@ -19,28 +19,11 @@ from core.calculator import ManualBigNumber, TriangulaNumberMatrix
 
 # ---------------------------------------------------------------------------
 # Known issues — tests marked xfail until the root cause is investigated.
-# ---------------------------------------------------------------------------
-# BUG-001: Digit 8 matrix constant selection is wrong for 999-digit inputs.
-#   - All 3 matrix modes agree with each other (consistent) but disagree
-#     with the gmpy2 baseline by exactly 1 character.
-#   - Root cause: digit_reducer returns reduced=9 (vpc9='360') for input
-#     length 999, but gmpy2 baseline implies vpc1='804' is correct.
-#     Digital root of (8 * 999 = 7992): 7992 % 9 == 0 → returns 9, but
-#     the correct constant index suggests a different mapping rule applies.
-#   - Affects: repDigitTriangularNumber, repDigitTriangularNumberMemory,
-#              repDigitTriangularNumberStream for digit=8.
-#   - DO NOT fix without reviewing the math in the research paper.
-_BUG_001 = pytest.mark.xfail(
-    reason="BUG-001: digit 8 constant selection off by 1 for 999-digit input — pre-existing math issue",
-    strict=True,
-)
-
 NUMBERS_DIR = os.path.join(os.path.dirname(__file__), "..", "static", "numbers")
 
 # Small window ranges that fit within 1k output (~1998 chars for most digits)
 TEST_WINDOWS = [(0, 10), (100, 200), (500, 600)]
 
-# Parametrize list with digit 8 flagged for BUG-001
 _DIGITS_BASELINE = [
     pytest.param("1"),
     pytest.param("2"),
@@ -49,7 +32,7 @@ _DIGITS_BASELINE = [
     pytest.param("5"),
     pytest.param("6"),
     pytest.param("7"),
-    pytest.param("8", marks=_BUG_001),
+    pytest.param("8"),
     pytest.param("9"),
 ]
 
